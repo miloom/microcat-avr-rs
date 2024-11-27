@@ -1,0 +1,55 @@
+[package]
+name = "microcat-avr-rs"
+version = "0.1.0"
+authors = ["Mikk Loomets <miloom@taltech.ee>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "microcat-avr-rs"
+test = false
+bench = false
+
+[dependencies]
+panic-halt = "0.2.0"
+ufmt = "0.2.0"
+cobs = { version = "0.2.3", default-features = false }
+heapless = "0.8.0"
+micropb = "0.1.0"
+#drv8830 = {git = "https://github.com/miloom/drv8830.git", default-features = false, features = ["embedded"]}
+drv8830 = {path = "../drv8830", default-features = false, features = ["embedded"]}
+embedded-hal = "1.0.0"
+avr-device = { version = "0.5.4", features = ["atmega328p", "rt", "critical-section-impl"] }
+micromath = "2.1.0"
+ufmt_float = "0.2.0"
+critical-section = { version = "1.2.0", features = ["restore-state-u8"] }
+
+
+[dependencies.arduino-hal]
+git = "https://github.com/rahix/avr-hal"
+features = ["arduino-uno", "critical-section-impl", "rt"]
+
+[build-dependencies]
+micropb-gen = "0.1.0"
+
+
+# The latest releases of `proc-macro2` do not support the rust toolchain that
+# we use.  Thus, we must fix this dependency to an older version where our
+# toolchain is still supported.  See https://github.com/Rahix/avr-hal/issues/537
+[build-dependencies.proc-macro2]
+version = "=1.0.79"
+
+# Configure the build for minimal size - AVRs have very little program memory
+[profile.dev]
+panic = "abort"
+lto = true
+opt-level = "s"
+overflow-checks = false # https://github.com/Rahix/avr-hal/issues/131
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+debug = true
+lto = true
+opt-level = "s"
+overflow-checks = false # https://github.com/Rahix/avr-hal/issues/131

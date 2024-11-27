@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package motor;
+
+enum Location {
+  FrontRight = 0;
+  BACK_RIGHT = 1;
+  BACK_LEFT = 2;
+  FrontLeft = 3;
+}
+
+message MotorTarget {
+  float target_position = 1;
+  float amplitude = 2;
+  float frequency = 3;
+  Location location = 4;
+}

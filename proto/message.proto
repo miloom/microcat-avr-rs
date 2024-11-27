@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package message;
+
+import "proto/encoder.proto";
+import "proto/imu.proto";
+import "proto/motor.proto";
+
+message Message {
+  oneof data {
+    encoder.Data encoder = 1;
+    imu.Telemetry telemetry = 2;
+    motor.MotorTarget motor = 3;
+  }
+}
