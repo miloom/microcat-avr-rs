@@ -262,6 +262,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8417c1409d9654cea2cc7440c2f057212b7e3a80dac5bac2a6f3dc303aa39e1"
 dependencies = [
+ "heapless",
  "never",
  "num-traits",
 ]

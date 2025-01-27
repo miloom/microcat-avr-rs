@@ -3,15 +3,15 @@ syntax = "proto3";
 package imu;
 
 message GyroData {
-  float x = 1;
-  float y = 2;
-  float z = 3;
+  sint32 x = 1; // x_angular_rate = x / 131 LSB(º/s)
+  sint32 y = 2; // y_angular_rate = y / 131 LSB(º/s)
+  sint32 z = 3; // z_angular_rate = z / 131 LSB(º/s)
 }
 
 message AccelData {
-  float x = 1;
-  float y = 2;
-  float z = 3;
+  sint32 x = 1;
+  sint32 y = 2;
+  sint32 z = 3;
 }
 
 message Telemetry {

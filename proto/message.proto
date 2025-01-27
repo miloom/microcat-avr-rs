@@ -9,7 +9,7 @@ import "proto/motor.proto";
 message Message {
   oneof data {
     encoder.Data encoder = 1;
-    imu.Telemetry telemetry = 2;
+    imu.Telemetry imu = 2;
     motor.MotorTarget motor = 3;
   }
 }

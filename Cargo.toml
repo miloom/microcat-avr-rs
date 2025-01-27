@@ -15,7 +15,7 @@ panic-halt = "0.2.0"
 ufmt = "0.2.0"
 cobs = { version = "0.2.3", default-features = false }
 heapless = "0.8.0"
-micropb = "0.1.0"
+micropb = { version = "0.1.0", features = ["container-heapless"]}
 drv8830 = {git = "https://github.com/miloom/drv8830.git"}
 icm20608g = { git = "https://github.com/miloom/icm20608g.git", default-features = false }
 embedded-hal = "1.0.0"

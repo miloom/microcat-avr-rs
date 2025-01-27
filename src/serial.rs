@@ -1,8 +1,9 @@
+use crate::serial::proto::imu_::{AccelData, GyroData};
 use crate::State;
 use arduino_hal::prelude::*;
 use heapless::Vec;
-use micropb::{MessageDecode, PbDecoder};
-use ufmt::{uwrite, uwriteln};
+use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
+use ufmt::uwriteln;
 
 mod proto {
 
@@ -50,7 +51,6 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                                 },
                                 _ => {
                                     unreachable!();
-                                    todo!("Check if it's okay to panic during operation")
                                 }
                             };
                            return Some(Command::MotorCommand(MotorCommand {
@@ -62,7 +62,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
 
                         }
                         Some(proto::message_::Message_::Data::Encoder(_)) => {}
-                        Some(proto::message_::Message_::Data::Telemetry(_)) => {}
+                        Some(proto::message_::Message_::Data::Imu(_)) => {}
                         None => {}
                     };
                 }
@@ -77,6 +77,54 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
         }
     }
     None
+}
+
+pub struct ImuReading {
+    pub accel_x: i16,
+    pub accel_y: i16,
+    pub accel_z: i16,
+    pub gyro_x: i16, // x_angular_rate = gyro_x / 131 LSB(º/s)
+    pub gyro_y: i16, // y_angular_rate = gyro_y / 131 LSB(º/s)
+    pub gyro_z: i16, // z_angular_rate = gyro_z / 131 LSB(º/s)
+}
+
+pub enum Telemetry {
+    Imu(ImuReading),
+}
+
+pub fn write(state: &mut State, telemetry: Telemetry) {
+    let message = proto::message_::Message {
+        data: Some(match telemetry {
+            Telemetry::Imu(reading) => {
+                let mut data = proto::imu_::Telemetry::default();
+                data.set_accel(AccelData {
+                    x: reading.accel_x as i32,
+                    y: reading.accel_y as i32,
+                    z: reading.accel_z as i32,
+                });
+                data.set_gyro(GyroData {
+                    x: reading.gyro_x as i32,
+                    y: reading.gyro_y as i32,
+                    z: reading.gyro_z as i32,
+                });
+                proto::message_::Message_::Data::Imu(data)
+            }
+        })
+    };
+    let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());
+    if message.encode(&mut encoder).is_ok() {
+        let writer = encoder.into_writer();
+        let (cobs_encoded, len) = encode_cobs(&writer);
+        for data in cobs_encoded.iter().take(len) {
+            state.serial.write_byte(*data);
+        }
+    }
+}
+
+fn encode_cobs(data: &[u8]) -> (Vec<u8, 128>, usize) {
+    let mut temporary = [0, 128];
+    let len = cobs::encode(data, &mut temporary);
+    (Vec::from_slice(&temporary[..len]).unwrap_or(Vec::new()), len)
 }
 
 fn decode_cobs(data: &[u8]) -> Option<Vec<u8, 128>> {

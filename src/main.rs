@@ -26,6 +26,7 @@ struct State {
 mod serial;
 mod motors;
 mod millis;
+mod imu;
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -81,7 +82,7 @@ fn main() -> ! {
         motor_system.initialize(MotorLocation::RearLeft, d10.into_pin_unchecked().downgrade(), &mut state);
     }
 
-
+    let imu = imu::Imu::new(&mut state);
 
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap();
 
@@ -108,6 +109,17 @@ fn main() -> ! {
             if let Some(motor) = motor_system.get_motor_mut(location) {
                 motor.update(&mut state);
             }
+        }
+        
+        if let Ok(imu_measurements) = imu.read(&mut state){
+            serial::write(&mut state, serial::Telemetry::Imu(serial::ImuReading {
+                accel_x: imu_measurements.accel_x,
+                accel_y: imu_measurements.accel_y,
+                accel_z: imu_measurements.accel_z,
+                gyro_x: imu_measurements.gyro_x,
+                gyro_y: imu_measurements.gyro_y,
+                gyro_z: imu_measurements.gyro_z,
+            }));
         }
         arduino_hal::delay_ms(10);
     }
