@@ -8,7 +8,7 @@ version = "0.1.0"
 source = "git+https://github.com/rahix/avr-hal#949130a5377b9ec5426b80699e56f3e876b6be41"
 dependencies = [
  "atmega-hal",
- "avr-device",
+ "avr-device 0.5.4",
  "avr-hal-generic",
  "cfg-if",
  "embedded-hal 0.2.7",
@@ -21,7 +21,7 @@ name = "atmega-hal"
 version = "0.1.0"
 source = "git+https://github.com/rahix/avr-hal#949130a5377b9ec5426b80699e56f3e876b6be41"
 dependencies = [
- "avr-device",
+ "avr-device 0.5.4",
  "avr-hal-generic",
 ]
 
@@ -37,7 +37,20 @@ version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "546b09da5e933d18b790ccb5aae351371c6c4f8094a7b011dcd7c7e7fb69cc94"
 dependencies = [
- "avr-device-macros",
+ "avr-device-macros 0.5.4",
+ "bare-metal",
+ "cfg-if",
+ "critical-section",
+ "vcell",
+]
+
+[[package]]
+name = "avr-device"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520f2031240156132bd83639d86aeb5b1907e6a228d9a4b44c3e9699827e6dae"
+dependencies = [
+ "avr-device-macros 0.7.0",
  "bare-metal",
  "cfg-if",
  "critical-section",
@@ -56,11 +69,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "avr-device-macros"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47c26fd925156183eb10e821b2ef7e06f8163f5a64a0bbe52fc896be2c6cbd3f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "avr-hal-generic"
 version = "0.1.0"
 source = "git+https://github.com/rahix/avr-hal#949130a5377b9ec5426b80699e56f3e876b6be41"
 dependencies = [
- "avr-device",
+ "avr-device 0.5.4",
  "cfg-if",
  "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
@@ -121,8 +145,8 @@ checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 [[package]]
 name = "drv8830"
 version = "0.1.0"
+source = "git+https://github.com/miloom/drv8830.git#de303a0c09fd7dfbc24d7d59df41e885fb926df7"
 dependencies = [
- "arduino-hal",
  "embedded-hal 1.0.0",
 ]
 
@@ -194,6 +218,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "icm20608g"
+version = "0.1.0"
+source = "git+https://github.com/miloom/icm20608g.git#34e67d2ed3c01180a16de950ad0e9be004238fbd"
+dependencies = [
+ "embedded-hal 1.0.0",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.165"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -210,12 +242,13 @@ name = "microcat-avr-rs"
 version = "0.1.0"
 dependencies = [
  "arduino-hal",
- "avr-device",
+ "avr-device 0.7.0",
  "cobs",
  "critical-section",
  "drv8830",
  "embedded-hal 1.0.0",
  "heapless",
+ "icm20608g",
  "micromath",
  "micropb",
  "micropb-gen",

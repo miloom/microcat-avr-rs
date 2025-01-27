@@ -16,10 +16,11 @@ ufmt = "0.2.0"
 cobs = { version = "0.2.3", default-features = false }
 heapless = "0.8.0"
 micropb = "0.1.0"
-#drv8830 = {git = "https://github.com/miloom/drv8830.git", default-features = false, features = ["embedded"]}
-drv8830 = {path = "../drv8830", default-features = false, features = ["embedded"]}
+drv8830 = {git = "https://github.com/miloom/drv8830.git"}
+icm20608g = { git = "https://github.com/miloom/icm20608g.git", default-features = false }
+
 embedded-hal = "1.0.0"
-avr-device = { version = "0.5.4", features = ["atmega328p", "rt", "critical-section-impl"] }
+avr-device = { version = "0.7.0", features = ["atmega328p", "rt", "critical-section-impl"] }
 micromath = "2.1.0"
 ufmt_float = "0.2.0"
 critical-section = { version = "1.2.0", features = ["restore-state-u8"] }
