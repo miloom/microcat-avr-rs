@@ -3,10 +3,10 @@ syntax = "proto3";
 package encoder;
 
 enum Location {
-  FrontRight = 0;
+  FRONT_RIGHT = 0;
   BACK_RIGHT = 1;
   BACK_LEFT = 2;
-  FrontLeft = 3;
+  FRONT_LEFT = 3;
 }
 
 message Data {

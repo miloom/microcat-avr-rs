@@ -4,16 +4,14 @@
 
 extern crate core;
 
-use core::panic::PanicInfo;
 use arduino_hal::{I2c, Spi, Usart};
 use arduino_hal::hal::port::*;
 use arduino_hal::pac::USART0;
 use arduino_hal::port::mode::{Input, Output};
-use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use arduino_hal::spi;
-use ufmt::uwriteln;
 use panic_halt as _;
-use crate::serial::read_serial;
+use strum::IntoEnumIterator;
+use crate::serial::{read_serial, Command};
 
 use motors::{MotorLocation, MotorSystem};
 
@@ -95,10 +93,21 @@ fn main() -> ! {
             led.toggle();
         }
         loop_counter += 1;
-        loop_counter %= 5000;
-        read_serial(&mut state);
-        if let Some(motor) = motor_system.get_motor_mut(MotorLocation::FrontLeft) {
-            motor.update(&mut state);
+        if let Some(command) = read_serial(&mut state) {
+            match command {
+                Command::MotorCommand(command) => {
+                    if let Some(motor) = motor_system.get_motor_mut(command.location) {
+                        motor.target_position = command.position;
+                        motor.amplitude = command.amplitude;
+                        motor.frequency = command.frequency;
+                    }
+                }
+            };
+        }
+        for location in MotorLocation::iter() {
+            if let Some(motor) = motor_system.get_motor_mut(location) {
+                motor.update(&mut state);
+            }
         }
         arduino_hal::delay_ms(10);
     }

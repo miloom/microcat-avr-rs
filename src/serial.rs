@@ -12,7 +12,18 @@ mod proto {
     include!(concat!(env!("OUT_DIR"), "/proto.rs"));
 }
 
-pub fn read_serial(state: &mut State) {
+pub struct MotorCommand {
+    pub location: crate::MotorLocation,
+    pub position: i32,
+    pub frequency: u32,
+    pub amplitude: u32,
+}
+
+pub enum Command {
+    MotorCommand(MotorCommand),
+}
+
+pub fn read_serial(state: &mut State) -> Option<Command> {
     // let data = nb::block!(state.serial.read());
     while let Ok(data) = state.serial.read() {
         if data == 0 {
@@ -24,22 +35,37 @@ pub fn read_serial(state: &mut State) {
                 if let Some(msg) = decode_proto(&cobs_decoded_data) {
                     match msg.data {
                         Some(proto::message_::Message_::Data::Motor(target)) => {
-                            uwriteln!(
-                                &mut state.serial,
-                                "Found motor message {}\r",
-                                target.target_position as i64
-                            )
-                            .unwrap_infallible();
+                            let location = match target.location {
+                                proto::motor_::Location::FrontLeft => {
+                                    crate::MotorLocation::FrontLeft
+                                },
+                                proto::motor_::Location::FrontRight => {
+                                    crate::MotorLocation::FrontRight
+                                },
+                                proto::motor_::Location::BackLeft => {
+                                    crate::MotorLocation::RearLeft
+                                },
+                                proto::motor_::Location::BackRight => {
+                                    crate::MotorLocation::RearRight
+                                },
+                                _ => {
+                                    unreachable!();
+                                    todo!("Check if it's okay to panic during operation")
+                                }
+                            };
+                           return Some(Command::MotorCommand(MotorCommand {
+                               frequency: target.frequency,
+                               amplitude: target.amplitude,
+                               position: target.target_position,
+                               location,
+                           }));
+
                         }
                         Some(proto::message_::Message_::Data::Encoder(_)) => {}
                         Some(proto::message_::Message_::Data::Telemetry(_)) => {}
                         None => {}
                     };
                 }
-                for val in cobs_decoded_data {
-                    uwrite!(&mut state.serial, "{:02x} ", val).unwrap_infallible();
-                }
-                uwriteln!(&mut state.serial, "{}\r", state.serial_buf_idx).unwrap_infallible();
             } else {
                 uwriteln!(&mut state.serial, "Failed to decode using cobs\r").unwrap_infallible();
             }
@@ -50,6 +76,7 @@ pub fn read_serial(state: &mut State) {
             state.serial_buf_idx += 1;
         }
     }
+    None
 }
 
 fn decode_cobs(data: &[u8]) -> Option<Vec<u8, 128>> {

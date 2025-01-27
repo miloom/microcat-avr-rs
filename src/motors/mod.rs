@@ -7,12 +7,13 @@ use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use core::f32::consts::PI;
 use drv8830::WriteRegister;
 use micromath::F32Ext;
+use strum::EnumIter;
 use ufmt::uwriteln;
 use as5040::{As5040, Encoder};
 mod pid;
 mod as5040;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum MotorLocation {
     FrontLeft,
     FrontRight,
@@ -55,10 +56,10 @@ impl MotorLocation {
 pub struct MotorController {
     encoder: As5040,
     location: MotorLocation,
-    pub frequency: f32,
-    pub amplitude: f32,
+    pub frequency: u32, // mHz
+    pub amplitude: u32,
     reversed: bool,
-    pub target_position: f32,
+    pub target_position: i32,
     pid: IntegerPID,
 }
 
@@ -68,10 +69,10 @@ impl MotorController {
         Self {
             encoder: As5040::new(cs),
             location,
-            frequency: 0.2,
-            amplitude: 100.0,
+            frequency: 200,
+            amplitude: 100,
             reversed: false,
-            target_position: 0.0,
+            target_position: 0,
             pid: IntegerPID::new(0.9, 0.05, 0.0, 100, -100, 100),
         }
     }
@@ -89,13 +90,15 @@ impl MotorController {
 
 
     pub fn update(&mut self, state: &mut State) {
+        let frequency_float = self.frequency as f32;
+        let amplitude_float = self.amplitude as f32;
         // calculate generalized angular position based on amplitude and frequency
         let time = millis() as f32 / 1000.0;
-        let period = 1.0 / self.frequency;
+        let period = 1.0 / frequency_float;
         let temp_time = fmodf(time, period);
-        let gen_xt: f32 = self.amplitude / 2.0 * (2.0 * PI * self.frequency * temp_time).sin();
+        let gen_xt: f32 = amplitude_float / 2.0 * (2.0 * PI * frequency_float * temp_time).sin();
 
-        let desired_position = self.target_position + gen_xt;
+        let desired_position = self.target_position + gen_xt as i32;
         let desired_position = if self.reversed {
             -desired_position
         } else {

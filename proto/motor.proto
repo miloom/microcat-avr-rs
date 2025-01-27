@@ -3,15 +3,15 @@ syntax = "proto3";
 package motor;
 
 enum Location {
-  FrontRight = 0;
+  FRONT_RIGHT = 0;
   BACK_RIGHT = 1;
   BACK_LEFT = 2;
-  FrontLeft = 3;
+  FRONT_LEFT = 3;
 }
 
 message MotorTarget {
-  float target_position = 1;
-  float amplitude = 2;
-  float frequency = 3;
+  sint32 target_position = 1;
+  uint32 amplitude = 2;
+  uint32 frequency = 3;   // mHz
   Location location = 4;
 }
