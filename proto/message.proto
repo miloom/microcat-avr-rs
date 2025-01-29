@@ -5,6 +5,7 @@ package message;
 import "proto/encoder.proto";
 import "proto/imu.proto";
 import "proto/motor.proto";
+import "proto/tone_detector.proto";
 
 message Message {
   oneof data {
@@ -12,5 +13,6 @@ message Message {
     imu.Telemetry imu = 2;
     motor.MotorTarget motor_target = 3;
     motor.MotorPosition motor_position = 4;
+    tone_detector.ToneDetectorStatus tone_detector_status = 5;
   }
 }

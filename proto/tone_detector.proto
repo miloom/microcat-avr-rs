@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package tone_detector;
+
+enum Location {
+    LEFT = 0;
+    RIGHT = 1;
+}
+
+message ToneDetectorStatus {
+    Location location = 1;
+    bool is_high = 2;
+}

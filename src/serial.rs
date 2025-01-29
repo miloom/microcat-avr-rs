@@ -1,4 +1,3 @@
-use crate::serial::proto::imu_::{AccelData, GyroData};
 use crate::State;
 use arduino_hal::prelude::*;
 use heapless::Vec;
@@ -7,10 +6,8 @@ use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 use ufmt::uwriteln;
 
 mod proto {
-
     #![allow(clippy::all)]
     #![allow(nonstandard_style, unused, irrefutable_let_patterns)]
-
     include!(concat!(env!("OUT_DIR"), "/proto.rs"));
 }
 
@@ -62,6 +59,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                         Some(proto::message_::Message_::Data::Encoder(_)) => {}
                         Some(proto::message_::Message_::Data::Imu(_)) => {}
                         Some(proto::message_::Message_::Data::MotorPosition(_)) => {}
+                        Some(proto::message_::Message_::Data::ToneDetectorStatus(_)) => {}
                         None => {}
                     };
                 }
@@ -93,9 +91,20 @@ pub struct MotorPosition {
     pub position: i16,
 }
 
+pub enum ToneDetectorLocation {
+    Right,
+    Left,
+}
+
+pub struct ToneDetectorStatus {
+    pub location: ToneDetectorLocation,
+    pub is_high: bool,
+}
+
 pub enum Telemetry {
     Imu(ImuReading),
     MotorPosition(MotorPosition),
+    ToneDetector(ToneDetectorStatus),
 }
 
 pub fn write(state: &mut State, telemetry: Telemetry) {
@@ -103,12 +112,12 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
         data: Some(match telemetry {
             Telemetry::Imu(reading) => {
                 let mut data = proto::imu_::Telemetry::default();
-                data.set_accel(AccelData {
+                data.set_accel(proto::imu_::AccelData {
                     x: reading.accel_x as i32,
                     y: reading.accel_y as i32,
                     z: reading.accel_z as i32,
                 });
-                data.set_gyro(GyroData {
+                data.set_gyro(proto::imu_::GyroData {
                     x: reading.gyro_x as i32,
                     y: reading.gyro_y as i32,
                     z: reading.gyro_z as i32,
@@ -133,6 +142,20 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
                     }
                 }};
                 proto::message_::Message_::Data::MotorPosition(data)
+            }
+            Telemetry::ToneDetector(tone_detector) => {
+                let data = proto::tone_detector_::ToneDetectorStatus {
+                    location: match tone_detector.location { 
+                        ToneDetectorLocation::Left => {
+                            proto::tone_detector_::Location::Left
+                        }
+                        ToneDetectorLocation::Right => {
+                            proto::tone_detector_::Location::Right
+                        }
+                    },
+                    is_high: tone_detector.is_high
+                };
+                proto::message_::Message_::Data::ToneDetectorStatus(data)
             }
         }),
     };

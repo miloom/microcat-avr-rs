@@ -27,6 +27,7 @@ mod imu;
 mod millis;
 mod motors;
 mod serial;
+mod tone_detector;
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -99,6 +100,9 @@ fn main() -> ! {
 
     let imu = imu::Imu::new(&mut state);
     
+    let right_tone_detector = tone_detector::ToneDetector::new(pins.d4.downgrade());
+    let left_tone_detector = tone_detector::ToneDetector::new(pins.d5.downgrade());
+
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap();
 
@@ -143,6 +147,15 @@ fn main() -> ! {
                 }),
             );
         }
+        serial::write(&mut state, serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
+            location: serial::ToneDetectorLocation::Left,
+            is_high: left_tone_detector.read()
+        }));
+        serial::write(&mut state, serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
+            location: serial::ToneDetectorLocation::Right,
+            is_high: right_tone_detector.read()
+        }));
+            
         arduino_hal::delay_ms(10);
     }
 }
