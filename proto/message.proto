@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package message;
 
-import "proto/encoder.proto";
-import "proto/imu.proto";
-import "proto/motor.proto";
-import "proto/tone_detector.proto";
+import "encoder.proto";
+import "imu.proto";
+import "motor.proto";
+import "tone_detector.proto";
 
 message Message {
   oneof data {

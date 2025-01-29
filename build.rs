@@ -12,6 +12,7 @@ fn main() {
         .collect::<Vec<String>>();
     eprintln!("{:?}", proto_files);
     gen.use_container_heapless();
+    gen.add_protoc_arg(format!("--proto_path={PROTO_DIR}"));
     gen.configure(".", micropb_gen::Config::new().max_len(8).max_bytes(16));
 
     gen.compile_protos(
