@@ -2,17 +2,15 @@ syntax = "proto3";
 
 package message;
 
-import "encoder.proto";
 import "imu.proto";
 import "motor.proto";
 import "tone_detector.proto";
 
 message Message {
   oneof data {
-    encoder.Data encoder = 1;
-    imu.Telemetry imu = 2;
-    motor.MotorTarget motor_target = 3;
-    motor.MotorPosition motor_position = 4;
-    tone_detector.ToneDetectorStatus tone_detector_status = 5;
+    imu.Telemetry imu = 1;
+    motor.MotorTarget motor_target = 2;
+    motor.MotorPosition motor_position = 3;
+    tone_detector.ToneDetectorStatus tone_detector_status = 4;
   }
 }

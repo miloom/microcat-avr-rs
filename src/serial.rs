@@ -56,7 +56,6 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                                 location,
                             }));
                         }
-                        Some(proto::message_::Message_::Data::Encoder(_)) => {}
                         Some(proto::message_::Message_::Data::Imu(_)) => {}
                         Some(proto::message_::Message_::Data::MotorPosition(_)) => {}
                         Some(proto::message_::Message_::Data::ToneDetectorStatus(_)) => {}
