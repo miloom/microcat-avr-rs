@@ -6,6 +6,7 @@ use arduino_hal::port::mode::Output;
 use arduino_hal::port::Pin;
 use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use embedded_hal::spi::SpiBus;
+#[cfg(feature = "logging")]
 use ufmt::uwriteln;
 
 pub trait Encoder {
@@ -60,6 +61,7 @@ impl Encoder for As5040 {
         let mut count = 0;
         loop {
             self.single_read(state);
+            #[cfg(feature = "logging")]
             uwriteln!(&mut state.serial, "Status: {:x}\r", self.status).unwrap();
             if self.status & Self::AS5040_STATUS_OCF as u8 != 0 {
                 break;

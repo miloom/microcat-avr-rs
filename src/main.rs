@@ -98,7 +98,8 @@ fn main() -> ! {
     }
 
     let imu = imu::Imu::new(&mut state);
-
+    
+    #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap();
 
     let mut loop_counter = 0;

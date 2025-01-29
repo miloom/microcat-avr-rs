@@ -3,6 +3,7 @@ use crate::State;
 use arduino_hal::prelude::*;
 use heapless::Vec;
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
+#[cfg(feature = "logging")]
 use ufmt::uwriteln;
 
 mod proto {
@@ -65,6 +66,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                     };
                 }
             } else {
+                #[cfg(feature = "logging")]
                 uwriteln!(&mut state.serial, "Failed to decode using cobs\r").unwrap_infallible();
             }
 

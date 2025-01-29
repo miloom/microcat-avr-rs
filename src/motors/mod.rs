@@ -9,6 +9,7 @@ use core::f32::consts::PI;
 use drv8830::WriteRegister;
 use micromath::F32Ext;
 use strum::EnumIter;
+#[cfg(feature = "logging")]
 use ufmt::uwriteln;
 mod as5040;
 mod pid;
@@ -79,6 +80,7 @@ impl MotorController {
 
     pub fn init(&mut self, state: &mut State) {
         if self.encoder.init(state).is_err() {
+            #[cfg(feature = "logging")]
             uwriteln!(
                 &mut state.serial,
                 "Failed to init {} encoder \r",
@@ -107,8 +109,6 @@ impl MotorController {
         } else {
             desired_position
         };
-        // uwriteln!(&mut state.serial, "Desired position {}\r", uFmt_f32::Two(desired_position)).unwrap();
-        // uwriteln!(&mut state.serial, "Encoder position {}\r", self.encoder.read(state)).unwrap();
         let shortest_path = desired_position as i16 - self.encoder.read(state);
         const ENCODER_MAX: i16 = 512; // Assumes range 0 - max
         let shortest_path = ((shortest_path + ENCODER_MAX / 2) % ENCODER_MAX + ENCODER_MAX)

@@ -54,3 +54,6 @@ debug = true
 lto = true
 opt-level = "s"
 overflow-checks = false # https://github.com/Rahix/avr-hal/issues/131
+
+[features]
+logging = []
