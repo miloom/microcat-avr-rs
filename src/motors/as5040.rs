@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::State;
 use arduino_hal::delay_ms;
 use arduino_hal::hal::port::Dynamic;

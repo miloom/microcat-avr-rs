@@ -1,6 +1,6 @@
-use core::marker::PhantomData;
-use arduino_hal::i2c::Error;
 use crate::State;
+use arduino_hal::i2c::Error;
+use core::marker::PhantomData;
 use icm20608g::structs::*;
 
 pub struct ImuMeasurements {
@@ -11,7 +11,6 @@ pub struct ImuMeasurements {
     pub gyro_y: i16, // y_angular_rate = gyro_y / 131 LSB(º/s)
     pub gyro_z: i16, // z_angular_rate = gyro_z / 131 LSB(º/s)
 }
-
 
 pub struct Imu {
     _phantom: PhantomData<()>,
@@ -60,9 +59,11 @@ impl Imu {
             gyro_offset.zg_offs = 0;
             let _ = gyro_offset.write(&mut state.i2c);
         }
-        Imu{ _phantom: Default::default() }
+        Imu {
+            _phantom: Default::default(),
+        }
     }
-    
+
     pub fn read(&self, state: &mut State) -> Result<ImuMeasurements, Error> {
         let accel_measurements = AccelMeasurements::new(&mut state.i2c)?;
         let gyro_measurements = GyroscopeMeasurements::new(&mut state.i2c)?;

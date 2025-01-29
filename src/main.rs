@@ -4,14 +4,14 @@
 
 extern crate core;
 
-use arduino_hal::{I2c, Spi, Usart};
+use crate::serial::{read_serial, Command};
 use arduino_hal::hal::port::*;
 use arduino_hal::pac::USART0;
 use arduino_hal::port::mode::{Input, Output};
 use arduino_hal::spi;
+use arduino_hal::{I2c, Spi, Usart};
 use panic_halt as _;
 use strum::IntoEnumIterator;
-use crate::serial::{read_serial, Command};
 
 use motors::{MotorLocation, MotorSystem};
 
@@ -23,14 +23,13 @@ struct State {
     spi: Spi,
 }
 
-mod serial;
-mod motors;
-mod millis;
 mod imu;
+mod millis;
+mod motors;
+mod serial;
 
 #[arduino_hal::entry]
 fn main() -> ! {
-
     let dp = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
     let serial = arduino_hal::default_serial!(dp, pins, 115200);
@@ -51,13 +50,13 @@ fn main() -> ! {
         pins.d11.into_output(),
         pins.d12.into_pull_up_input(),
         pins.d10.into_output(),
-        spi::Settings{
+        spi::Settings {
             data_order: spi::DataOrder::MostSignificantFirst,
             clock: spi::SerialClockRate::OscfOver16,
             mode: embedded_hal::spi::Mode {
                 polarity: embedded_hal::spi::Polarity::IdleHigh,
                 phase: embedded_hal::spi::Phase::CaptureOnSecondTransition,
-            }
+            },
         },
     );
 
@@ -74,19 +73,33 @@ fn main() -> ! {
     };
 
     let mut motor_system = MotorSystem::new();
-    motor_system.initialize(MotorLocation::FrontLeft, pins.d8.into_output().downgrade(), &mut state);
-    motor_system.initialize(MotorLocation::FrontRight, pins.d7.into_output().downgrade(), &mut state);
-    motor_system.initialize(MotorLocation::RearLeft, pins.d9.into_output().downgrade(), &mut state);
+    motor_system.initialize(
+        MotorLocation::FrontLeft,
+        pins.d8.into_output().downgrade(),
+        &mut state,
+    );
+    motor_system.initialize(
+        MotorLocation::FrontRight,
+        pins.d7.into_output().downgrade(),
+        &mut state,
+    );
+    motor_system.initialize(
+        MotorLocation::RearLeft,
+        pins.d9.into_output().downgrade(),
+        &mut state,
+    );
     unsafe {
         // We will never remove the pin from this motor and the motor will never turn it into input so this is safe.
-        motor_system.initialize(MotorLocation::RearLeft, d10.into_pin_unchecked().downgrade(), &mut state);
+        motor_system.initialize(
+            MotorLocation::RearLeft,
+            d10.into_pin_unchecked().downgrade(),
+            &mut state,
+        );
     }
 
     let imu = imu::Imu::new(&mut state);
 
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap();
-
-
 
     let mut loop_counter = 0;
     loop {
@@ -108,20 +121,27 @@ fn main() -> ! {
         for location in MotorLocation::iter() {
             if let Some(motor) = motor_system.get_motor_mut(location) {
                 motor.update(&mut state);
+                let position = serial::Telemetry::MotorPosition(serial::MotorPosition {
+                  location,
+                    position: motor.get_position(&mut state)
+                });
+                serial::write(&mut state, position);
             }
         }
-        
-        if let Ok(imu_measurements) = imu.read(&mut state){
-            serial::write(&mut state, serial::Telemetry::Imu(serial::ImuReading {
-                accel_x: imu_measurements.accel_x,
-                accel_y: imu_measurements.accel_y,
-                accel_z: imu_measurements.accel_z,
-                gyro_x: imu_measurements.gyro_x,
-                gyro_y: imu_measurements.gyro_y,
-                gyro_z: imu_measurements.gyro_z,
-            }));
+
+        if let Ok(imu_measurements) = imu.read(&mut state) {
+            serial::write(
+                &mut state,
+                serial::Telemetry::Imu(serial::ImuReading {
+                    accel_x: imu_measurements.accel_x,
+                    accel_y: imu_measurements.accel_y,
+                    accel_z: imu_measurements.accel_z,
+                    gyro_x: imu_measurements.gyro_x,
+                    gyro_y: imu_measurements.gyro_y,
+                    gyro_z: imu_measurements.gyro_z,
+                }),
+            );
         }
         arduino_hal::delay_ms(10);
     }
 }
-

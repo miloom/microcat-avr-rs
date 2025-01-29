@@ -1,15 +1,16 @@
+#![allow(dead_code)]
 pub struct IntegerPID {
-    kp: i32,          // Proportional coefficient (scaled)
-    ki: i32,          // Integral coefficient (scaled)
-    kd: i32,          // Derivative coefficient (scaled)
-    scale: i32,       // Scale factor for fixed-point arithmetic
-    prev_error: i32,  // Previous error (for derivative calculation)
-    integral: i32,    // Accumulated integral term
-    output_min: i32,  // Minimum output limit (scaled)
-    output_max: i32,  // Maximum output limit (scaled)
-    p_max: i32,       // Maximum value of the proportional part (scaled)
-    i_max: i32,       // Maximum value of the integral part (scaled)
-    d_max: i32,       // Maximum value of the derivative part (scaled)
+    kp: i32,         // Proportional coefficient (scaled)
+    ki: i32,         // Integral coefficient (scaled)
+    kd: i32,         // Derivative coefficient (scaled)
+    scale: i32,      // Scale factor for fixed-point arithmetic
+    prev_error: i32, // Previous error (for derivative calculation)
+    integral: i32,   // Accumulated integral term
+    output_min: i32, // Minimum output limit (scaled)
+    output_max: i32, // Maximum output limit (scaled)
+    p_max: i32,      // Maximum value of the proportional part (scaled)
+    i_max: i32,      // Maximum value of the integral part (scaled)
+    d_max: i32,      // Maximum value of the derivative part (scaled)
 }
 
 impl IntegerPID {
@@ -34,7 +35,7 @@ impl IntegerPID {
         self.p_max = (max * self.scale as f32) as i32;
         self
     }
-    
+
     pub fn i(&mut self, ki: f32, max: f32) -> &mut IntegerPID {
         self.ki = (ki * self.scale as f32) as i32;
         self.i_max = (max * self.scale as f32) as i32;
@@ -48,7 +49,6 @@ impl IntegerPID {
     }
 
     pub fn compute(&mut self, error: i32) -> f32 {
-
         // Proportional term
         let p_term = (self.kp * error).clamp(-self.p_max, self.p_max);
 

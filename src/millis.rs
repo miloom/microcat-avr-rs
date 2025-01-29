@@ -1,4 +1,3 @@
-
 use core::cell;
 
 const PRESCALER: u32 = 1024;

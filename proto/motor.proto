@@ -15,3 +15,8 @@ message MotorTarget {
   uint32 frequency = 3;   // mHz
   Location location = 4;
 }
+
+message MotorPosition {
+  Location location = 1;
+  sint32 position = 2;
+}

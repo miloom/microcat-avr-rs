@@ -35,34 +35,32 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
             if let Some(cobs_decoded_data) = cobs_decoded_data {
                 if let Some(msg) = decode_proto(&cobs_decoded_data) {
                     match msg.data {
-                        Some(proto::message_::Message_::Data::Motor(target)) => {
+                        Some(proto::message_::Message_::Data::MotorTarget(target)) => {
                             let location = match target.location {
                                 proto::motor_::Location::FrontLeft => {
                                     crate::MotorLocation::FrontLeft
-                                },
+                                }
                                 proto::motor_::Location::FrontRight => {
                                     crate::MotorLocation::FrontRight
-                                },
-                                proto::motor_::Location::BackLeft => {
-                                    crate::MotorLocation::RearLeft
-                                },
+                                }
+                                proto::motor_::Location::BackLeft => crate::MotorLocation::RearLeft,
                                 proto::motor_::Location::BackRight => {
                                     crate::MotorLocation::RearRight
-                                },
+                                }
                                 _ => {
                                     unreachable!();
                                 }
                             };
-                           return Some(Command::MotorCommand(MotorCommand {
-                               frequency: target.frequency,
-                               amplitude: target.amplitude,
-                               position: target.target_position,
-                               location,
-                           }));
-
+                            return Some(Command::MotorCommand(MotorCommand {
+                                frequency: target.frequency,
+                                amplitude: target.amplitude,
+                                position: target.target_position,
+                                location,
+                            }));
                         }
                         Some(proto::message_::Message_::Data::Encoder(_)) => {}
                         Some(proto::message_::Message_::Data::Imu(_)) => {}
+                        Some(proto::message_::Message_::Data::MotorPosition(_)) => {}
                         None => {}
                     };
                 }
@@ -88,8 +86,14 @@ pub struct ImuReading {
     pub gyro_z: i16, // z_angular_rate = gyro_z / 131 LSB(º/s)
 }
 
+pub struct MotorPosition {
+    pub location: crate::MotorLocation,
+    pub position: i16,
+}
+
 pub enum Telemetry {
     Imu(ImuReading),
+    MotorPosition(MotorPosition),
 }
 
 pub fn write(state: &mut State, telemetry: Telemetry) {
@@ -109,7 +113,26 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
                 });
                 proto::message_::Message_::Data::Imu(data)
             }
-        })
+            Telemetry::MotorPosition(position) => {
+                let data = proto::motor_::MotorPosition {
+                position: position.position as i32,
+                location: match position.location {
+                    crate::MotorLocation::RearLeft => {
+                        proto::motor_::Location::BackLeft
+                    },
+                    crate::MotorLocation::FrontLeft => {
+                        proto::motor_::Location::FrontLeft
+                    },
+                    crate::MotorLocation::FrontRight => {
+                        proto::motor_::Location::FrontRight
+                    },
+                    crate::MotorLocation::RearRight => {
+                        proto::motor_::Location::BackRight
+                    }
+                }};
+                proto::message_::Message_::Data::MotorPosition(data)
+            }
+        }),
     };
     let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());
     if message.encode(&mut encoder).is_ok() {
@@ -124,7 +147,10 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
 fn encode_cobs(data: &[u8]) -> (Vec<u8, 128>, usize) {
     let mut temporary = [0, 128];
     let len = cobs::encode(data, &mut temporary);
-    (Vec::from_slice(&temporary[..len]).unwrap_or(Vec::new()), len)
+    (
+        Vec::from_slice(&temporary[..len]).unwrap_or(Vec::new()),
+        len,
+    )
 }
 
 fn decode_cobs(data: &[u8]) -> Option<Vec<u8, 128>> {

@@ -10,6 +10,7 @@ message Message {
   oneof data {
     encoder.Data encoder = 1;
     imu.Telemetry imu = 2;
-    motor.MotorTarget motor = 3;
+    motor.MotorTarget motor_target = 3;
+    motor.MotorPosition motor_position = 4;
   }
 }

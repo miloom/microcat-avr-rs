@@ -4,14 +4,14 @@ use crate::State;
 use arduino_hal::port::mode::Output;
 use arduino_hal::port::Pin;
 use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
+use as5040::{As5040, Encoder};
 use core::f32::consts::PI;
 use drv8830::WriteRegister;
 use micromath::F32Ext;
 use strum::EnumIter;
 use ufmt::uwriteln;
-use as5040::{As5040, Encoder};
-mod pid;
 mod as5040;
+mod pid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum MotorLocation {
@@ -87,7 +87,10 @@ impl MotorController {
             .unwrap_infallible();
         }
     }
-
+    
+    pub fn get_position(&mut self, state: &mut State) -> i16 {
+        self.encoder.read(state)
+    }
 
     pub fn update(&mut self, state: &mut State) {
         let frequency_float = self.frequency as f32;
