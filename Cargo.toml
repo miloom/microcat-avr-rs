@@ -24,6 +24,7 @@ micromath = "2.1.0"
 ufmt_float = "0.2.0"
 critical-section = { version = "1.2.0", features = ["restore-state-u8"] }
 strum = { version = "0.26.3", default-features = false, features = ["derive"] }
+ms5837-02ba = {git = "https://github.com/miloom/ms5837-02ba.git"}
 
 
 [dependencies.arduino-hal]

@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package pressure;
+
+message PressureData {
+    int32 temperature = 1; // 0.01 deg_c
+    int32 pressure = 2; // 0.01 mBar
+}

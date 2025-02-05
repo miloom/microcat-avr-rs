@@ -59,6 +59,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                         Some(proto::message_::Message_::Data::Imu(_)) => {}
                         Some(proto::message_::Message_::Data::MotorPosition(_)) => {}
                         Some(proto::message_::Message_::Data::ToneDetectorStatus(_)) => {}
+                        Some(proto::message_::Message_::Data::PressureData(_)) => {}
                         None => {}
                     };
                 }
@@ -100,13 +101,21 @@ pub struct ToneDetectorStatus {
     pub is_high: bool,
 }
 
+pub struct PressureValues {
+    pub pressure: i32,    // 0.01 mBar
+    pub temperature: i32, // 0.01 deg_C
+}
+
 pub enum Telemetry {
     Imu(ImuReading),
     MotorPosition(MotorPosition),
     ToneDetector(ToneDetectorStatus),
+    PressureData(PressureValues),
 }
 
 pub fn write(state: &mut State, telemetry: Telemetry) {
+    #[cfg(feature = "logging")]
+    ufmt::uwriteln!(&mut state.serial, "Serial Write\r").unwrap();
     let message = proto::message_::Message {
         data: Some(match telemetry {
             Telemetry::Imu(reading) => {
@@ -125,62 +134,56 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
             }
             Telemetry::MotorPosition(position) => {
                 let data = proto::motor_::MotorPosition {
-                position: position.position as i32,
-                location: match position.location {
-                    crate::MotorLocation::RearLeft => {
-                        proto::motor_::Location::BackLeft
+                    position: position.position as i32,
+                    location: match position.location {
+                        crate::MotorLocation::RearLeft => proto::motor_::Location::BackLeft,
+                        crate::MotorLocation::FrontLeft => proto::motor_::Location::FrontLeft,
+                        crate::MotorLocation::FrontRight => proto::motor_::Location::FrontRight,
+                        crate::MotorLocation::RearRight => proto::motor_::Location::BackRight,
                     },
-                    crate::MotorLocation::FrontLeft => {
-                        proto::motor_::Location::FrontLeft
-                    },
-                    crate::MotorLocation::FrontRight => {
-                        proto::motor_::Location::FrontRight
-                    },
-                    crate::MotorLocation::RearRight => {
-                        proto::motor_::Location::BackRight
-                    }
-                }};
+                };
                 proto::message_::Message_::Data::MotorPosition(data)
             }
             Telemetry::ToneDetector(tone_detector) => {
                 let data = proto::tone_detector_::ToneDetectorStatus {
-                    location: match tone_detector.location { 
-                        ToneDetectorLocation::Left => {
-                            proto::tone_detector_::Location::Left
-                        }
-                        ToneDetectorLocation::Right => {
-                            proto::tone_detector_::Location::Right
-                        }
+                    location: match tone_detector.location {
+                        ToneDetectorLocation::Left => proto::tone_detector_::Location::Left,
+                        ToneDetectorLocation::Right => proto::tone_detector_::Location::Right,
                     },
-                    is_high: tone_detector.is_high
+                    is_high: tone_detector.is_high,
                 };
                 proto::message_::Message_::Data::ToneDetectorStatus(data)
+            }
+            Telemetry::PressureData(data) => {
+                let data = proto::pressure_::PressureData {
+                    pressure: data.pressure,
+                    temperature: data.temperature,
+                };
+                proto::message_::Message_::Data::PressureData(data)
             }
         }),
     };
     let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());
     if message.encode(&mut encoder).is_ok() {
         let writer = encoder.into_writer();
-        let (cobs_encoded, len) = encode_cobs(&writer);
+        let (cobs_encoded, len) = encode_cobs(&writer, state);
         for data in cobs_encoded.iter().take(len) {
             state.serial.write_byte(*data);
         }
     }
 }
 
-fn encode_cobs(data: &[u8]) -> (Vec<u8, 128>, usize) {
-    let mut temporary = [0, 128];
+fn encode_cobs(data: &[u8], state: &mut State) -> ([u8; 128], usize) {
+    let mut temporary = [0; 128];
     let len = cobs::encode(data, &mut temporary);
-    (
-        Vec::from_slice(&temporary[..len]).unwrap_or(Vec::new()),
-        len,
-    )
+    temporary[len] = 0;
+    (temporary, len + 1)
 }
 
-fn decode_cobs(data: &[u8]) -> Option<Vec<u8, 128>> {
+fn decode_cobs(data: &[u8]) -> Option<[u8; 128]> {
     let mut temporary = [0; 128];
     if let Ok(len) = cobs::decode(data, &mut temporary) {
-        return Some(Vec::from_slice(&temporary[..len]).unwrap_or(Vec::new()));
+        return Some(temporary);
     }
     None
 }

@@ -4,10 +4,12 @@
 
 extern crate core;
 
-use crate::serial::{read_serial, Command};
+use crate::serial::{read_serial, Command, PressureValues, Telemetry};
 use arduino_hal::hal::port::*;
+use arduino_hal::i2c::Direction;
 use arduino_hal::pac::USART0;
 use arduino_hal::port::mode::{Input, Output};
+use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use arduino_hal::spi;
 use arduino_hal::{I2c, Spi, Usart};
 use panic_halt as _;
@@ -26,6 +28,7 @@ struct State {
 mod imu;
 mod millis;
 mod motors;
+mod pressure_sensor;
 mod serial;
 mod tone_detector;
 
@@ -33,8 +36,14 @@ mod tone_detector;
 fn main() -> ! {
     let dp = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
-    let serial = arduino_hal::default_serial!(dp, pins, 115200);
+    let mut led = pins.a0.into_output();
+
+    let mut serial = arduino_hal::default_serial!(dp, pins, 115200);
+    led.set_high();
+
     millis::init(dp.TC0);
+    #[cfg(feature = "logging")]
+    ufmt::uwriteln!(&mut serial, "Millis done...\r").unwrap();
 
     // Enable interrupts globally
     unsafe { avr_device::interrupt::enable() };
@@ -60,10 +69,13 @@ fn main() -> ! {
             },
         },
     );
+    #[cfg(feature = "logging")]
+    ufmt::uwriteln!(&mut serial, "SPI done...\r").unwrap();
 
-    let mut led = pins.a0.into_output();
     let mut motor_power = pins.a3.into_output();
     motor_power.set_high();
+    #[cfg(feature = "logging")]
+    ufmt::uwriteln!(&mut serial, "Motor Power done...\r").unwrap();
 
     let mut state = State {
         serial,
@@ -73,7 +85,8 @@ fn main() -> ! {
         spi,
     };
 
-    let mut motor_system = MotorSystem::new();
+    // let mut motor_system = MotorSystem::new();
+    /*
     motor_system.initialize(
         MotorLocation::FrontLeft,
         pins.d8.into_output().downgrade(),
@@ -97,11 +110,21 @@ fn main() -> ! {
             &mut state,
         );
     }
+    */
 
     let imu = imu::Imu::new(&mut state);
-    
+    #[cfg(feature = "logging")]
+    ufmt::uwriteln!(&mut state.serial, "IMU Done...\r").unwrap();
+
     let right_tone_detector = tone_detector::ToneDetector::new(pins.d4.downgrade());
     let left_tone_detector = tone_detector::ToneDetector::new(pins.d5.downgrade());
+    #[cfg(feature = "logging")]
+    state
+        .i2c
+        .i2cdetect(&mut state.serial, Direction::Write)
+        .unwrap_infallible();
+
+    let pressure_sensor = pressure_sensor::PressureSensor::new(&mut state).unwrap();
 
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap();
@@ -112,6 +135,7 @@ fn main() -> ! {
             led.toggle();
         }
         loop_counter += 1;
+        /*
         if let Some(command) = read_serial(&mut state) {
             match command {
                 Command::MotorCommand(command) => {
@@ -127,14 +151,18 @@ fn main() -> ! {
             if let Some(motor) = motor_system.get_motor_mut(location) {
                 motor.update(&mut state);
                 let position = serial::Telemetry::MotorPosition(serial::MotorPosition {
-                  location,
-                    position: motor.get_position(&mut state)
+                    location,
+                    position: motor.get_position(&mut state),
                 });
                 serial::write(&mut state, position);
             }
         }
-
+         */
+        #[cfg(feature = "logging")]
+        ufmt::uwriteln!(&mut state.serial, "Reading IMU...\r").unwrap();
         if let Ok(imu_measurements) = imu.read(&mut state) {
+            #[cfg(feature = "logging")]
+            ufmt::uwriteln!(&mut state.serial, "IMU Read...\r").unwrap();
             serial::write(
                 &mut state,
                 serial::Telemetry::Imu(serial::ImuReading {
@@ -146,16 +174,38 @@ fn main() -> ! {
                     gyro_z: imu_measurements.gyro_z,
                 }),
             );
+        } else {
+            #[cfg(feature = "logging")]
+            ufmt::uwriteln!(&mut state.serial, "Reading IMU failed\r").unwrap();
         }
-        serial::write(&mut state, serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
-            location: serial::ToneDetectorLocation::Left,
-            is_high: left_tone_detector.read()
-        }));
-        serial::write(&mut state, serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
-            location: serial::ToneDetectorLocation::Right,
-            is_high: right_tone_detector.read()
-        }));
-            
+        #[cfg(feature = "logging")]
+        ufmt::uwriteln!(&mut state.serial, "Reading ToneDetectors...\r").unwrap();
+        serial::write(
+            &mut state,
+            serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
+                location: serial::ToneDetectorLocation::Left,
+                is_high: left_tone_detector.read(),
+            }),
+        );
+        serial::write(
+            &mut state,
+            serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
+                location: serial::ToneDetectorLocation::Right,
+                is_high: right_tone_detector.read(),
+            }),
+        );
+
+        #[cfg(feature = "logging")]
+        ufmt::uwriteln!(&mut state.serial, "Reading PressureSensor...\r").unwrap();
+        if let Some(pressure_data) = pressure_sensor.read(&mut state) {
+            serial::write(
+                &mut state,
+                Telemetry::PressureData(PressureValues {
+                    pressure: pressure_data.pressure,
+                    temperature: pressure_data.temperature,
+                }),
+            )
+        }
         arduino_hal::delay_ms(10);
     }
 }

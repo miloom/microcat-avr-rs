@@ -5,6 +5,7 @@ package message;
 import "imu.proto";
 import "motor.proto";
 import "tone_detector.proto";
+import "pressure.proto";
 
 message Message {
   oneof data {
@@ -12,5 +13,6 @@ message Message {
     motor.MotorTarget motor_target = 2;
     motor.MotorPosition motor_position = 3;
     tone_detector.ToneDetectorStatus tone_detector_status = 4;
+    pressure.PressureData pressure_data = 5;
   }
 }
