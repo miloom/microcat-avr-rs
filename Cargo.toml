@@ -28,7 +28,7 @@ ms5837-02ba = { git = "https://github.com/miloom/ms5837-02ba.git" }
 
 [dependencies.atmega-hal]
 git = "https://github.com/Rahix/avr-hal"
-features = ["atmega328p"]
+features = ["atmega328p", "enable-extra-adc"]
 
 [build-dependencies]
 micropb-gen = "0.1.0"

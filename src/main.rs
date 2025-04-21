@@ -7,7 +7,7 @@ extern crate core;
 use crate::serial::{read_serial, Command, PressureValues, Telemetry};
 #[cfg(feature = "logging")]
 use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
-use atmega_hal::clock::Clock;
+use atmega_hal::adc::channel;
 use atmega_hal::pac::USART0;
 use atmega_hal::port::mode::{Input, Output};
 use atmega_hal::port::*;
@@ -29,6 +29,7 @@ struct State {
     i2c: I2c<CoreClock>,
     spi: Spi,
 }
+
 static mut LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
 
 mod imu;
@@ -40,6 +41,7 @@ mod timer;
 mod tone_detector;
 
 type CoreClock = atmega_hal::clock::MHz16;
+type Adc = atmega_hal::adc::Adc<CoreClock>;
 
 #[avr_device::entry]
 fn main() -> ! {
@@ -102,7 +104,6 @@ fn main() -> ! {
         i2c,
         spi,
     };
-
     let mut motor_system = MotorSystem::new();
     motor_system.initialize(
         MotorLocation::FrontLeft,
@@ -142,7 +143,7 @@ fn main() -> ! {
 
     let pressure_sensor = pressure_sensor::PressureSensor::new(&mut state).unwrap();
 
-    // let battery = pins.a6;
+    let mut adc = Adc::new(dp.ADC, Default::default());
 
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap();
@@ -228,6 +229,13 @@ fn main() -> ! {
                     temperature: pressure_data.temperature,
                 }),
             )
+        }
+
+        {
+            let value = adc.read_blocking(&channel::ADC6);
+            const AVCC: u32 = 5000;
+            let battery_mv = (value as u32 * AVCC) / 1023;
+            serial::write(&mut state, Telemetry::BatteryVoltage(battery_mv))
         }
     }
 }

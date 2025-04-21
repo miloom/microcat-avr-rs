@@ -60,6 +60,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                         Some(proto::message_::Message_::Data::MotorPosition(_)) => {}
                         Some(proto::message_::Message_::Data::ToneDetectorStatus(_)) => {}
                         Some(proto::message_::Message_::Data::PressureData(_)) => {}
+                        Some(proto::message_::Message_::Data::BatterVoltage(_)) => {}
                         None => {}
                     };
                 }
@@ -111,6 +112,7 @@ pub enum Telemetry {
     MotorPosition(MotorPosition),
     ToneDetector(ToneDetectorStatus),
     PressureData(PressureValues),
+    BatteryVoltage(u32),
 }
 
 pub fn write(state: &mut State, telemetry: Telemetry) {
@@ -160,6 +162,9 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
                     temperature: data.temperature,
                 };
                 proto::message_::Message_::Data::PressureData(data)
+            }
+            Telemetry::BatteryVoltage(voltage) => {
+                proto::message_::Message_::Data::BatterVoltage(voltage)
             }
         }),
     };

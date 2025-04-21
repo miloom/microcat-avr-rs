@@ -8,11 +8,12 @@ import "tone_detector.proto";
 import "pressure.proto";
 
 message Message {
-  oneof data {
-    imu.Telemetry imu = 1;
-    motor.MotorTarget motor_target = 2;
-    motor.MotorPosition motor_position = 3;
-    tone_detector.ToneDetectorStatus tone_detector_status = 4;
-    pressure.PressureData pressure_data = 5;
-  }
+    oneof data {
+        imu.Telemetry imu = 1;
+        motor.MotorTarget motor_target = 2;
+        motor.MotorPosition motor_position = 3;
+        tone_detector.ToneDetectorStatus tone_detector_status = 4;
+        pressure.PressureData pressure_data = 5;
+        uint32 batter_voltage = 6; // Measured battery voltage in mV
+    }
 }
