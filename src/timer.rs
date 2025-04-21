@@ -14,9 +14,9 @@ pub fn rig_timer(tmr1: &TC1) {
      https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf
      section 15.11
     */
-    use arduino_hal::clock::Clock;
+    use atmega_hal::clock::Clock;
 
-    const ARDUINO_UNO_CLOCK_FREQUENCY_HZ: u32 = arduino_hal::DefaultClock::FREQ;
+    const CORE_CLOCK_FREQ: u32 = crate::CoreClock::FREQ;
     const CLOCK_SOURCE: CS1_A = CS1_A::PRESCALE_256;
     let clock_divisor: u32 = match CLOCK_SOURCE {
         CS1_A::DIRECT => 1,
@@ -27,7 +27,7 @@ pub fn rig_timer(tmr1: &TC1) {
         CS1_A::NO_CLOCK | CS1_A::EXT_FALLING | CS1_A::EXT_RISING => 1,
     };
 
-    let ticks = calc_overflow(ARDUINO_UNO_CLOCK_FREQUENCY_HZ, 1, clock_divisor) as u16;
+    let ticks = calc_overflow(CORE_CLOCK_FREQ, 1, clock_divisor) as u16;
 
     tmr1.tccr1a.write(|w| w.wgm1().bits(0b00));
     tmr1.tccr1b.write(|w| {

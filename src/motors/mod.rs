@@ -1,11 +1,11 @@
 use crate::millis::millis;
 use crate::motors::pid::IntegerPID;
 use crate::State;
-use arduino_hal::port::mode::Output;
-use arduino_hal::port::Pin;
 #[cfg(feature = "logging")]
 use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use as5040::{As5040, Encoder};
+use atmega_hal::port::mode::Output;
+use atmega_hal::port::Pin;
 use core::f32::consts::PI;
 use drv8830::WriteRegister;
 use micromath::F32Ext;

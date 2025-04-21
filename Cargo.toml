@@ -15,8 +15,8 @@ panic-halt = "0.2.0"
 ufmt = "0.2.0"
 cobs = { version = "0.2.3", default-features = false }
 heapless = "0.8.0"
-micropb = { version = "0.1.0", features = ["container-heapless"]}
-drv8830 = {git = "https://github.com/miloom/drv8830.git"}
+micropb = { version = "0.1.0", features = ["container-heapless"] }
+drv8830 = { git = "https://github.com/miloom/drv8830.git" }
 icm20608g = { git = "https://github.com/miloom/icm20608g.git", default-features = false }
 embedded-hal = "1.0.0"
 avr-device = { version = "0.7.0", features = ["atmega328p", "rt", "critical-section-impl"] }
@@ -24,12 +24,11 @@ micromath = "2.1.0"
 ufmt_float = "0.2.0"
 critical-section = { version = "1.2.0", features = ["restore-state-u8"] }
 strum = { version = "0.26.3", default-features = false, features = ["derive"] }
-ms5837-02ba = {git = "https://github.com/miloom/ms5837-02ba.git"}
+ms5837-02ba = { git = "https://github.com/miloom/ms5837-02ba.git" }
 
-
-[dependencies.arduino-hal]
-git = "https://github.com/rahix/avr-hal"
-features = ["arduino-uno", "critical-section-impl", "rt"]
+[dependencies.atmega-hal]
+git = "https://github.com/Rahix/avr-hal"
+features = ["atmega328p"]
 
 [build-dependencies]
 micropb-gen = "0.1.0"

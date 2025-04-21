@@ -1,5 +1,5 @@
 use crate::State;
-use arduino_hal::i2c::Error;
+use atmega_hal::i2c::Error;
 use core::marker::PhantomData;
 use icm20608g::structs::*;
 

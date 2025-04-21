@@ -6,7 +6,7 @@ pub struct PressureSensor {
 }
 
 impl PressureSensor {
-    pub fn new(state: &mut State) -> Result<PressureSensor, arduino_hal::i2c::Error> {
+    pub fn new(state: &mut State) -> Result<PressureSensor, atmega_hal::i2c::Error> {
         let ms5837_02ba = Ms5837_02ba::new(&mut state.i2c)?;
         Ok(PressureSensor { ms5837_02ba })
     }

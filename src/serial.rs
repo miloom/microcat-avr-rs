@@ -1,5 +1,5 @@
 use crate::State;
-use arduino_hal::prelude::*;
+use atmega_hal::prelude::*;
 use heapless::Vec;
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 #[cfg(feature = "logging")]

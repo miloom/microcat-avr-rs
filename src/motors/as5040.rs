@@ -1,10 +1,9 @@
 #![allow(dead_code)]
 use crate::State;
-use arduino_hal::delay_ms;
-use arduino_hal::hal::port::Dynamic;
-use arduino_hal::port::mode::Output;
-use arduino_hal::port::Pin;
-use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
+use atmega_hal::port::mode::Output;
+use atmega_hal::port::Dynamic;
+use atmega_hal::port::Pin;
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use embedded_hal::spi::SpiBus;
 #[cfg(feature = "logging")]
 use ufmt::uwriteln;
@@ -69,7 +68,7 @@ impl Encoder for As5040 {
             if count > 30 {
                 return Err(());
             }
-            delay_ms(1);
+            // delay_ms(1);
             count += 1;
         }
         Ok(())

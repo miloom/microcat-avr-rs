@@ -5,13 +5,15 @@
 extern crate core;
 
 use crate::serial::{read_serial, Command, PressureValues, Telemetry};
-use arduino_hal::hal::port::*;
-use arduino_hal::pac::USART0;
-use arduino_hal::port::mode::{Input, Output};
 #[cfg(feature = "logging")]
 use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
-use arduino_hal::spi;
-use arduino_hal::{I2c, Spi, Usart};
+use atmega_hal::clock::Clock;
+use atmega_hal::pac::USART0;
+use atmega_hal::port::mode::{Input, Output};
+use atmega_hal::port::*;
+use atmega_hal::spi;
+use atmega_hal::usart::Baudrate;
+use atmega_hal::{I2c, Spi, Usart};
 use avr_device::atmega328p::TC1;
 use core::sync::atomic::AtomicBool;
 use panic_halt as _;
@@ -21,10 +23,10 @@ use crate::timer::rig_timer;
 use motors::{MotorLocation, MotorSystem};
 
 struct State {
-    serial: Usart<USART0, Pin<Input, PD0>, Pin<Output, PD1>>,
+    serial: Usart<USART0, Pin<Input, PD0>, Pin<Output, PD1>, CoreClock>,
     serial_buf: [u8; 128],
     serial_buf_idx: usize,
-    i2c: I2c,
+    i2c: I2c<CoreClock>,
     spi: Spi,
 }
 static mut LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
@@ -37,14 +39,21 @@ mod serial;
 mod timer;
 mod tone_detector;
 
-#[arduino_hal::entry]
+type CoreClock = atmega_hal::clock::MHz16;
+
+#[avr_device::entry]
 fn main() -> ! {
-    let dp = arduino_hal::Peripherals::take().unwrap();
-    let pins = arduino_hal::pins!(dp);
-    let mut led = pins.a0.into_output();
+    let dp = atmega_hal::Peripherals::take().unwrap();
+    let pins = atmega_hal::pins!(dp);
+    let mut led = pins.pc0.into_output();
 
     #[allow(unused_mut, reason = "This mut is only needed with logging macro")]
-    let mut serial = arduino_hal::default_serial!(dp, pins, 115200);
+    let mut serial = Usart::new(
+        dp.USART0,
+        pins.pd0,
+        pins.pd1.into_output(),
+        Baudrate::<CoreClock>::new(115200),
+    );
     led.set_high();
 
     millis::init(dp.TC0);
@@ -57,18 +66,18 @@ fn main() -> ! {
     // Enable interrupts globally
     unsafe { avr_device::interrupt::enable() };
 
-    let i2c = arduino_hal::I2c::new(
+    let i2c = I2c::new(
         dp.TWI,
-        pins.a4.into_pull_up_input(),
-        pins.a5.into_pull_up_input(),
+        pins.pc4.into_pull_up_input(),
+        pins.pc5.into_pull_up_input(),
         100_000,
     );
-    let (spi, d10) = arduino_hal::Spi::new(
+    let (spi, d10) = Spi::new(
         dp.SPI,
-        pins.d13.into_output(),
-        pins.d11.into_output(),
-        pins.d12.into_pull_up_input(),
-        pins.d10.into_output(),
+        pins.pb5.into_output(),
+        pins.pb3.into_output(),
+        pins.pb4.into_pull_up_input(),
+        pins.pb2.into_output(),
         spi::Settings {
             data_order: spi::DataOrder::MostSignificantFirst,
             clock: spi::SerialClockRate::OscfOver16,
@@ -81,7 +90,7 @@ fn main() -> ! {
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut serial, "SPI done...\r").unwrap();
 
-    let mut motor_power = pins.a3.into_output();
+    let mut motor_power = pins.pc3.into_output();
     motor_power.set_high();
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut serial, "Motor Power done...\r").unwrap();
@@ -97,17 +106,17 @@ fn main() -> ! {
     let mut motor_system = MotorSystem::new();
     motor_system.initialize(
         MotorLocation::FrontLeft,
-        pins.d8.into_output().downgrade(),
+        pins.pb0.into_output().downgrade(),
         &mut state,
     );
     motor_system.initialize(
         MotorLocation::FrontRight,
-        pins.d7.into_output().downgrade(),
+        pins.pd7.into_output().downgrade(),
         &mut state,
     );
     motor_system.initialize(
         MotorLocation::RearLeft,
-        pins.d9.into_output().downgrade(),
+        pins.pb1.into_output().downgrade(),
         &mut state,
     );
     unsafe {
@@ -123,8 +132,8 @@ fn main() -> ! {
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut state.serial, "IMU Done...\r").unwrap();
 
-    let right_tone_detector = tone_detector::ToneDetector::new(pins.d4.downgrade());
-    let left_tone_detector = tone_detector::ToneDetector::new(pins.d5.downgrade());
+    let right_tone_detector = tone_detector::ToneDetector::new(pins.pd4.downgrade());
+    let left_tone_detector = tone_detector::ToneDetector::new(pins.pd5.downgrade());
     #[cfg(feature = "logging")]
     state
         .i2c
@@ -132,6 +141,8 @@ fn main() -> ! {
         .unwrap_infallible();
 
     let pressure_sensor = pressure_sensor::PressureSensor::new(&mut state).unwrap();
+
+    // let battery = pins.a6;
 
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap();
@@ -218,7 +229,6 @@ fn main() -> ! {
                 }),
             )
         }
-        arduino_hal::delay_ms(10);
     }
 }
 
