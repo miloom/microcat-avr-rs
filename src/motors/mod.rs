@@ -3,6 +3,7 @@ use crate::motors::pid::IntegerPID;
 use crate::State;
 use arduino_hal::port::mode::Output;
 use arduino_hal::port::Pin;
+#[cfg(feature = "logging")]
 use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use as5040::{As5040, Encoder};
 use core::f32::consts::PI;
@@ -27,6 +28,7 @@ fn fmodf(x: f32, y: f32) -> f32 {
 }
 
 impl MotorLocation {
+    #[allow(unused)]
     pub const fn to_str(self) -> &'static str {
         match self {
             MotorLocation::FrontLeft => "FrontLeft",
@@ -89,7 +91,7 @@ impl MotorController {
             .unwrap_infallible();
         }
     }
-    
+
     pub fn get_position(&mut self, state: &mut State) -> i16 {
         self.encoder.read(state)
     }
@@ -158,11 +160,6 @@ impl MotorSystem {
         let index = position.as_index();
         self.controllers[index] = Some(MotorController::new(position, pin));
         self.controllers[index].as_mut().unwrap().init(state);
-    }
-
-    pub fn get_motor(&self, position: MotorLocation) -> Option<&MotorController> {
-        let index = position.as_index();
-        self.controllers[index].as_ref()
     }
 
     pub fn get_motor_mut(&mut self, position: MotorLocation) -> Option<&mut MotorController> {

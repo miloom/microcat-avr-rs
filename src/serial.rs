@@ -166,14 +166,14 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
     let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());
     if message.encode(&mut encoder).is_ok() {
         let writer = encoder.into_writer();
-        let (cobs_encoded, len) = encode_cobs(&writer, state);
+        let (cobs_encoded, len) = encode_cobs(&writer);
         for data in cobs_encoded.iter().take(len) {
             state.serial.write_byte(*data);
         }
     }
 }
 
-fn encode_cobs(data: &[u8], state: &mut State) -> ([u8; 128], usize) {
+fn encode_cobs(data: &[u8]) -> ([u8; 128], usize) {
     let mut temporary = [0; 128];
     let len = cobs::encode(data, &mut temporary);
     temporary[len] = 0;
@@ -182,7 +182,7 @@ fn encode_cobs(data: &[u8], state: &mut State) -> ([u8; 128], usize) {
 
 fn decode_cobs(data: &[u8]) -> Option<[u8; 128]> {
     let mut temporary = [0; 128];
-    if let Ok(len) = cobs::decode(data, &mut temporary) {
+    if cobs::decode(data, &mut temporary).is_ok() {
         return Some(temporary);
     }
     None

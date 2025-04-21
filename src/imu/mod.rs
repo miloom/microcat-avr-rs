@@ -4,12 +4,12 @@ use core::marker::PhantomData;
 use icm20608g::structs::*;
 
 pub struct ImuMeasurements {
-    pub accel_x: i16,
-    pub accel_y: i16,
-    pub accel_z: i16,
-    pub gyro_x: i16, // x_angular_rate = gyro_x / 131 LSB(º/s)
-    pub gyro_y: i16, // y_angular_rate = gyro_y / 131 LSB(º/s)
-    pub gyro_z: i16, // z_angular_rate = gyro_z / 131 LSB(º/s)
+    pub accel_x: i16, // cm/s^2
+    pub accel_y: i16, // cm/s^2
+    pub accel_z: i16, // cm/s^2
+    pub gyro_x: i16,  // x_angular_rate = gyro_x / 131 LSB(º/s)
+    pub gyro_y: i16,  // y_angular_rate = gyro_y / 131 LSB(º/s)
+    pub gyro_z: i16,  // z_angular_rate = gyro_z / 131 LSB(º/s)
 }
 
 pub struct Imu {
@@ -32,7 +32,7 @@ impl Imu {
         if let Ok(mut cfg) = Config::new(&mut state.i2c) {
             #[cfg(feature = "logging")]
             ufmt::uwriteln!(&mut state.serial, "IMU read gyroscope and temp config\r").unwrap();
-            // Set the gyroscope and temp sensor to slowest mode highest res
+            // Set the gyroscope and temp sensor to the slowest mode the highest res
             cfg.dlpf_cfg = 6;
             if cfg.write(&mut state.i2c).is_ok() {
                 #[cfg(feature = "logging")]

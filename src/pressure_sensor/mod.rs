@@ -1,6 +1,4 @@
 use crate::State;
-use embedded_hal::i2c;
-use embedded_hal::i2c::{Error, ErrorKind, NoAcknowledgeSource};
 use ms5837_02ba::{Ms5837_02ba, SensorData};
 
 pub struct PressureSensor {
@@ -27,13 +25,13 @@ impl PressureSensor {
             .unwrap();
             return data;
         } else {
-            let error_ret = temp.err().unwrap();
+            let _error_ret = temp.err().unwrap();
 
             #[cfg(feature = "logging")]
             ufmt::uwriteln!(
                 &mut state.serial,
                 "Got error {} {}\r",
-                match error_ret.0.kind() {
+                match _error_ret.0.kind() {
                     ErrorKind::Bus => {
                         "Bus"
                     }
@@ -57,7 +55,7 @@ impl PressureSensor {
                         ""
                     }
                 },
-                error_ret.1
+                _error_ret.1
             )
             .unwrap();
         }

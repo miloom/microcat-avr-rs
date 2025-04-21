@@ -6,15 +6,18 @@ extern crate core;
 
 use crate::serial::{read_serial, Command, PressureValues, Telemetry};
 use arduino_hal::hal::port::*;
-use arduino_hal::i2c::Direction;
 use arduino_hal::pac::USART0;
 use arduino_hal::port::mode::{Input, Output};
+#[cfg(feature = "logging")]
 use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use arduino_hal::spi;
 use arduino_hal::{I2c, Spi, Usart};
+use avr_device::atmega328p::TC1;
+use core::sync::atomic::AtomicBool;
 use panic_halt as _;
 use strum::IntoEnumIterator;
 
+use crate::timer::rig_timer;
 use motors::{MotorLocation, MotorSystem};
 
 struct State {
@@ -24,12 +27,14 @@ struct State {
     i2c: I2c,
     spi: Spi,
 }
+static mut LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
 
 mod imu;
 mod millis;
 mod motors;
 mod pressure_sensor;
 mod serial;
+mod timer;
 mod tone_detector;
 
 #[arduino_hal::entry]
@@ -38,12 +43,16 @@ fn main() -> ! {
     let pins = arduino_hal::pins!(dp);
     let mut led = pins.a0.into_output();
 
+    #[allow(unused_mut, reason = "This mut is only needed with logging macro")]
     let mut serial = arduino_hal::default_serial!(dp, pins, 115200);
     led.set_high();
 
     millis::init(dp.TC0);
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut serial, "Millis done...\r").unwrap();
+
+    let tmr1: TC1 = dp.TC1;
+    rig_timer(&tmr1);
 
     // Enable interrupts globally
     unsafe { avr_device::interrupt::enable() };
@@ -85,8 +94,7 @@ fn main() -> ! {
         spi,
     };
 
-    // let mut motor_system = MotorSystem::new();
-    /*
+    let mut motor_system = MotorSystem::new();
     motor_system.initialize(
         MotorLocation::FrontLeft,
         pins.d8.into_output().downgrade(),
@@ -110,7 +118,6 @@ fn main() -> ! {
             &mut state,
         );
     }
-    */
 
     let imu = imu::Imu::new(&mut state);
     #[cfg(feature = "logging")]
@@ -131,11 +138,16 @@ fn main() -> ! {
 
     let mut loop_counter = 0;
     loop {
+        unsafe {
+            while !LOOP_INTERRUPT.load(core::sync::atomic::Ordering::SeqCst) {}
+            LOOP_INTERRUPT.store(false, core::sync::atomic::Ordering::SeqCst);
+        }
         if loop_counter == 0 {
             led.toggle();
         }
         loop_counter += 1;
-        /*
+        loop_counter %= 100;
+
         if let Some(command) = read_serial(&mut state) {
             match command {
                 Command::MotorCommand(command) => {
@@ -157,7 +169,7 @@ fn main() -> ! {
                 serial::write(&mut state, position);
             }
         }
-         */
+
         #[cfg(feature = "logging")]
         ufmt::uwriteln!(&mut state.serial, "Reading IMU...\r").unwrap();
         if let Ok(imu_measurements) = imu.read(&mut state) {
@@ -207,5 +219,12 @@ fn main() -> ! {
             )
         }
         arduino_hal::delay_ms(10);
+    }
+}
+
+#[avr_device::interrupt(atmega328p)]
+fn TIMER1_COMPA() {
+    unsafe {
+        LOOP_INTERRUPT.store(true, core::sync::atomic::Ordering::SeqCst);
     }
 }
