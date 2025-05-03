@@ -1,16 +1,20 @@
 #![no_std]
 #![no_main]
 #![feature(abi_avr_interrupt)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+#![warn(clippy::allow_attributes_without_reason)]
 
 extern crate core;
 
 use crate::serial::{read_serial, Command, PressureValues, Telemetry};
-#[cfg(feature = "logging")]
-use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use atmega_hal::adc::channel;
+#[cfg(feature = "logging")]
+use atmega_hal::i2c::Direction;
 use atmega_hal::pac::USART0;
 use atmega_hal::port::mode::{Input, Output};
 use atmega_hal::port::*;
+#[cfg(feature = "logging")]
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use atmega_hal::spi;
 use atmega_hal::usart::Baudrate;
 use atmega_hal::{I2c, Spi, Usart};
@@ -30,6 +34,10 @@ struct State {
     spi: Spi,
 }
 
+#[allow(
+    static_mut_refs,
+    reason = "This is needed for main loop timer interrupt"
+)]
 static mut LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
 
 mod imu;
@@ -45,6 +53,10 @@ type Adc = atmega_hal::adc::Adc<CoreClock>;
 
 #[avr_device::entry]
 fn main() -> ! {
+    #[allow(
+        clippy::unwrap_used,
+        reason = "We require peripherals to be able to run any logic"
+    )]
     let dp = atmega_hal::Peripherals::take().unwrap();
     let pins = atmega_hal::pins!(dp);
     let mut led = pins.pc0.into_output();
@@ -60,7 +72,7 @@ fn main() -> ! {
 
     millis::init(dp.TC0);
     #[cfg(feature = "logging")]
-    ufmt::uwriteln!(&mut serial, "Millis done...\r").unwrap();
+    ufmt::uwriteln!(&mut serial, "Millis done...\r").unwrap_infallible();
 
     let tmr1: TC1 = dp.TC1;
     rig_timer(&tmr1);
@@ -90,12 +102,12 @@ fn main() -> ! {
         },
     );
     #[cfg(feature = "logging")]
-    ufmt::uwriteln!(&mut serial, "SPI done...\r").unwrap();
+    ufmt::uwriteln!(&mut serial, "SPI done...\r").unwrap_infallible();
 
     let mut motor_power = pins.pc3.into_output();
     motor_power.set_high();
     #[cfg(feature = "logging")]
-    ufmt::uwriteln!(&mut serial, "Motor Power done...\r").unwrap();
+    ufmt::uwriteln!(&mut serial, "Motor Power done...\r").unwrap_infallible();
 
     let mut state = State {
         serial,
@@ -131,7 +143,7 @@ fn main() -> ! {
 
     let imu = imu::Imu::new(&mut state);
     #[cfg(feature = "logging")]
-    ufmt::uwriteln!(&mut state.serial, "IMU Done...\r").unwrap();
+    ufmt::uwriteln!(&mut state.serial, "IMU Done...\r").unwrap_infallible();
 
     let right_tone_detector = tone_detector::ToneDetector::new(pins.pd4.downgrade());
     let left_tone_detector = tone_detector::ToneDetector::new(pins.pd5.downgrade());
@@ -141,17 +153,27 @@ fn main() -> ! {
         .i2cdetect(&mut state.serial, Direction::Write)
         .unwrap_infallible();
 
-    let pressure_sensor = pressure_sensor::PressureSensor::new(&mut state).unwrap();
+    let pressure_sensor = pressure_sensor::PressureSensor::new(&mut state).ok();
 
     let mut adc = Adc::new(dp.ADC, Default::default());
 
     #[cfg(feature = "logging")]
-    ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap();
+    ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap_infallible();
 
     let mut loop_counter = 0;
     loop {
         unsafe {
-            while !LOOP_INTERRUPT.load(core::sync::atomic::Ordering::SeqCst) {}
+            #[allow(
+                static_mut_refs,
+                reason = "This is needed for main loop timer interrupt"
+            )]
+            while !LOOP_INTERRUPT.load(core::sync::atomic::Ordering::SeqCst) {
+                core::hint::spin_loop()
+            }
+            #[allow(
+                static_mut_refs,
+                reason = "This is needed for main loop timer interrupt"
+            )]
             LOOP_INTERRUPT.store(false, core::sync::atomic::Ordering::SeqCst);
         }
         if loop_counter == 0 {
@@ -183,10 +205,10 @@ fn main() -> ! {
         }
 
         #[cfg(feature = "logging")]
-        ufmt::uwriteln!(&mut state.serial, "Reading IMU...\r").unwrap();
+        ufmt::uwriteln!(&mut state.serial, "Reading IMU...\r").unwrap_infallible();
         if let Ok(imu_measurements) = imu.read(&mut state) {
             #[cfg(feature = "logging")]
-            ufmt::uwriteln!(&mut state.serial, "IMU Read...\r").unwrap();
+            ufmt::uwriteln!(&mut state.serial, "IMU Read...\r").unwrap_infallible();
             serial::write(
                 &mut state,
                 serial::Telemetry::Imu(serial::ImuReading {
@@ -200,10 +222,10 @@ fn main() -> ! {
             );
         } else {
             #[cfg(feature = "logging")]
-            ufmt::uwriteln!(&mut state.serial, "Reading IMU failed\r").unwrap();
+            ufmt::uwriteln!(&mut state.serial, "Reading IMU failed\r").unwrap_infallible();
         }
         #[cfg(feature = "logging")]
-        ufmt::uwriteln!(&mut state.serial, "Reading ToneDetectors...\r").unwrap();
+        ufmt::uwriteln!(&mut state.serial, "Reading ToneDetectors...\r").unwrap_infallible();
         serial::write(
             &mut state,
             serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
@@ -220,15 +242,17 @@ fn main() -> ! {
         );
 
         #[cfg(feature = "logging")]
-        ufmt::uwriteln!(&mut state.serial, "Reading PressureSensor...\r").unwrap();
-        if let Some(pressure_data) = pressure_sensor.read(&mut state) {
-            serial::write(
-                &mut state,
-                Telemetry::PressureData(PressureValues {
-                    pressure: pressure_data.pressure,
-                    temperature: pressure_data.temperature,
-                }),
-            )
+        ufmt::uwriteln!(&mut state.serial, "Reading PressureSensor...\r").unwrap_infallible();
+        if let Some(ref pressure_sensor) = pressure_sensor {
+            if let Some(pressure_data) = pressure_sensor.read(&mut state) {
+                serial::write(
+                    &mut state,
+                    Telemetry::PressureData(PressureValues {
+                        pressure: pressure_data.pressure,
+                        temperature: pressure_data.temperature,
+                    }),
+                )
+            }
         }
 
         {
@@ -243,6 +267,10 @@ fn main() -> ! {
 #[avr_device::interrupt(atmega328p)]
 fn TIMER1_COMPA() {
     unsafe {
+        #[allow(
+            static_mut_refs,
+            reason = "This is needed for main loop timer interrupt"
+        )]
         LOOP_INTERRUPT.store(true, core::sync::atomic::Ordering::SeqCst);
     }
 }

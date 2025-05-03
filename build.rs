@@ -6,7 +6,7 @@ fn main() {
 
     const PROTO_DIR: &str = "./proto";
 
-    let proto_files = find_proto_files(&Path::new(&PROTO_DIR))
+    let proto_files = find_proto_files(Path::new(&PROTO_DIR))
         .iter()
         .map(|p| p.display().to_string())
         .collect::<Vec<String>>();

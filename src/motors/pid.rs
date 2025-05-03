@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 pub struct IntegerPID {
     kp: i32,         // Proportional coefficient (scaled)
     ki: i32,         // Integral coefficient (scaled)
@@ -30,18 +29,21 @@ impl IntegerPID {
         }
     }
 
+    #[allow(dead_code, reason = "This is a convenience function for future")]
     pub fn p(&mut self, kp: f32, max: f32) -> &mut IntegerPID {
         self.kp = (kp * self.scale as f32) as i32;
         self.p_max = (max * self.scale as f32) as i32;
         self
     }
 
+    #[allow(dead_code, reason = "This is a convenience function for future")]
     pub fn i(&mut self, ki: f32, max: f32) -> &mut IntegerPID {
         self.ki = (ki * self.scale as f32) as i32;
         self.i_max = (max * self.scale as f32) as i32;
         self
     }
 
+    #[allow(dead_code, reason = "This is a convenience function for future")]
     pub fn d(&mut self, kd: f32, max: f32) -> &mut IntegerPID {
         self.kd = (kd * self.scale as f32) as i32;
         self.d_max = (max * self.scale as f32) as i32;

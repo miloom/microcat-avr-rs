@@ -1,11 +1,11 @@
 use crate::millis::millis;
 use crate::motors::pid::IntegerPID;
 use crate::State;
-#[cfg(feature = "logging")]
-use arduino_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use as5040::{As5040, Encoder};
 use atmega_hal::port::mode::Output;
 use atmega_hal::port::Pin;
+#[cfg(feature = "logging")]
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use core::f32::consts::PI;
 use drv8830::WriteRegister;
 use micromath::F32Ext;
@@ -28,7 +28,7 @@ fn fmodf(x: f32, y: f32) -> f32 {
 }
 
 impl MotorLocation {
-    #[allow(unused)]
+    #[allow(unused, reason = "This function is only needed for logging feature")]
     pub const fn to_str(self) -> &'static str {
         match self {
             MotorLocation::FrontLeft => "FrontLeft",
@@ -159,7 +159,9 @@ impl MotorSystem {
     pub fn initialize(&mut self, position: MotorLocation, pin: Pin<Output>, state: &mut State) {
         let index = position.as_index();
         self.controllers[index] = Some(MotorController::new(position, pin));
-        self.controllers[index].as_mut().unwrap().init(state);
+        if let Some(motor) = self.controllers[index].as_mut() {
+            motor.init(state);
+        }
     }
 
     pub fn get_motor_mut(&mut self, position: MotorLocation) -> Option<&mut MotorController> {

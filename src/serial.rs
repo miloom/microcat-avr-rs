@@ -6,8 +6,16 @@ use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 use ufmt::uwriteln;
 
 mod proto {
-    #![allow(clippy::all)]
-    #![allow(nonstandard_style, unused, irrefutable_let_patterns)]
+    #![allow(
+        clippy::all,
+        reason = "This is auto generated code so we do not apply rules to it"
+    )]
+    #![allow(
+        nonstandard_style,
+        unused,
+        irrefutable_let_patterns,
+        reason = "This is auto generated code so we do not apply rules to it"
+    )]
     include!(concat!(env!("OUT_DIR"), "/proto.rs"));
 }
 

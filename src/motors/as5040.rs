@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::State;
 use atmega_hal::port::mode::Output;
 use atmega_hal::port::Dynamic;
@@ -20,11 +19,31 @@ pub(crate) struct As5040 {
 }
 
 impl As5040 {
-    // defines for 5 bit _status value
+    // defines for 5 bit status value
+    #[allow(
+        dead_code,
+        reason = "These are only needed when writing logic for return codes"
+    )]
     const AS5040_STATUS_OCF: u16 = 0x10;
+    #[allow(
+        dead_code,
+        reason = "These are only needed when writing logic for return codes"
+    )]
     const AS5040_STATUS_COF: u16 = 0x08;
+    #[allow(
+        dead_code,
+        reason = "These are only needed when writing logic for return codes"
+    )]
     const AS5040_STATUS_LIN: u16 = 0x04;
+    #[allow(
+        dead_code,
+        reason = "These are only needed when writing logic for return codes"
+    )]
     const AS5040_STATUS_MAGINC: u16 = 0x02;
+    #[allow(
+        dead_code,
+        reason = "These are only needed when writing logic for return codes"
+    )]
     const AS5040_STATUS_MAGDEC: u16 = 0x01;
 
     pub fn new(cs: Pin<Output, Dynamic>) -> Self {
@@ -61,7 +80,7 @@ impl Encoder for As5040 {
         loop {
             self.single_read(state);
             #[cfg(feature = "logging")]
-            uwriteln!(&mut state.serial, "Status: {:x}\r", self.status).unwrap();
+            uwriteln!(&mut state.serial, "Status: {:x}\r", self.status).unwrap_infallible();
             if self.status & Self::AS5040_STATUS_OCF as u8 != 0 {
                 break;
             }
