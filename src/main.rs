@@ -6,40 +6,6 @@
 
 extern crate core;
 
-use crate::serial::{read_serial, Command, PressureValues, Telemetry};
-use atmega_hal::adc::channel;
-#[cfg(feature = "logging")]
-use atmega_hal::i2c::Direction;
-use atmega_hal::pac::USART0;
-use atmega_hal::port::mode::{Input, Output};
-use atmega_hal::port::*;
-#[cfg(feature = "logging")]
-use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
-use atmega_hal::spi;
-use atmega_hal::usart::Baudrate;
-use atmega_hal::{I2c, Spi, Usart};
-use avr_device::atmega328p::TC1;
-use core::sync::atomic::AtomicBool;
-use panic_halt as _;
-use strum::IntoEnumIterator;
-
-use crate::timer::rig_timer;
-use motors::{MotorLocation, MotorSystem};
-
-struct State {
-    serial: Usart<USART0, Pin<Input, PD0>, Pin<Output, PD1>, CoreClock>,
-    serial_buf: [u8; 128],
-    serial_buf_idx: usize,
-    i2c: I2c<CoreClock>,
-    spi: Spi,
-}
-
-#[allow(
-    static_mut_refs,
-    reason = "This is needed for main loop timer interrupt"
-)]
-static mut LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
-
 mod imu;
 mod millis;
 mod motors;
@@ -48,12 +14,55 @@ mod serial;
 mod timer;
 mod tone_detector;
 
-type CoreClock = atmega_hal::clock::MHz16;
-type Adc = atmega_hal::adc::Adc<CoreClock>;
+use atmega_hal::adc::AdcSettings;
+use atmega_hal::clock;
+#[cfg(feature = "logging")]
+use atmega_hal::i2c::Direction;
+use atmega_hal::pac::USART0;
+use atmega_hal::port::mode::{Input, Output};
+use atmega_hal::port::{Pin, PD0, PD1};
+#[cfg(feature = "logging")]
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
+use atmega_hal::spi;
+use atmega_hal::usart::Baudrate;
+use atmega_hal::{adc, adc::channel};
+use atmega_hal::{I2c, Spi, Usart};
+use avr_device::atmega328p::TC1;
+use core::sync::atomic::AtomicBool;
+use core::sync::atomic::Ordering;
+use embedded_hal::spi::{Mode, Phase, Polarity};
+use panic_halt as _;
+use serial::{read_serial, Command, PressureValues, Telemetry};
+use strum::IntoEnumIterator as _;
+
+use crate::timer::rig_timer;
+use motors::{MotorLocation, MotorSystem};
+
+static LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
+
+type Adc = adc::Adc<CoreClock>;
+type CoreClock = clock::MHz16;
+struct State {
+    i2c: I2c<CoreClock>,
+    serial: Usart<USART0, Pin<Input, PD0>, Pin<Output, PD1>, CoreClock>,
+    serial_buf: [u8; 128],
+    serial_buf_idx: usize,
+    spi: Spi,
+}
 
 #[avr_device::entry]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Main function is allowed to be large"
+)]
+#[expect(
+    clippy::single_call_fn,
+    reason = "Main will always be called only once"
+)]
 fn main() -> ! {
-    #[allow(
+    const AVCC: u32 = 5000;
+
+    #[expect(
         clippy::unwrap_used,
         reason = "We require peripherals to be able to run any logic"
     )]
@@ -61,16 +70,19 @@ fn main() -> ! {
     let pins = atmega_hal::pins!(dp);
     let mut led = pins.pc0.into_output();
 
-    #[allow(unused_mut, reason = "This mut is only needed with logging macro")]
+    #[cfg_attr(
+        not(feature = "logging"),
+        expect(unused_mut, reason = "This mut is only needed with logging macro")
+    )]
     let mut serial = Usart::new(
         dp.USART0,
         pins.pd0,
         pins.pd1.into_output(),
-        Baudrate::<CoreClock>::new(115200),
+        Baudrate::<CoreClock>::new(115_200),
     );
     led.set_high();
 
-    millis::init(dp.TC0);
+    millis::init(&dp.TC0);
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut serial, "Millis done...\r").unwrap_infallible();
 
@@ -78,7 +90,11 @@ fn main() -> ! {
     rig_timer(&tmr1);
 
     // Enable interrupts globally
-    unsafe { avr_device::interrupt::enable() };
+    // SAFETY: Enabling interrupts is unsafe
+    unsafe {
+        use avr_device::interrupt;
+        interrupt::enable();
+    };
 
     let i2c = I2c::new(
         dp.TWI,
@@ -95,9 +111,9 @@ fn main() -> ! {
         spi::Settings {
             data_order: spi::DataOrder::MostSignificantFirst,
             clock: spi::SerialClockRate::OscfOver16,
-            mode: embedded_hal::spi::Mode {
-                polarity: embedded_hal::spi::Polarity::IdleHigh,
-                phase: embedded_hal::spi::Phase::CaptureOnSecondTransition,
+            mode: Mode {
+                polarity: Polarity::IdleHigh,
+                phase: Phase::CaptureOnSecondTransition,
             },
         },
     );
@@ -132,14 +148,14 @@ fn main() -> ! {
         pins.pb1.into_output().downgrade(),
         &mut state,
     );
+    // SAFETY:  We will never remove the pin from this motor and the motor will never turn it into input so this is safe.
     unsafe {
-        // We will never remove the pin from this motor and the motor will never turn it into input so this is safe.
         motor_system.initialize(
             MotorLocation::RearLeft,
             d10.into_pin_unchecked().downgrade(),
             &mut state,
         );
-    }
+    };
 
     let imu = imu::Imu::new(&mut state);
     #[cfg(feature = "logging")]
@@ -155,31 +171,22 @@ fn main() -> ! {
 
     let pressure_sensor = pressure_sensor::PressureSensor::new(&mut state).ok();
 
-    let mut adc = Adc::new(dp.ADC, Default::default());
+    let mut adc = Adc::new(dp.ADC, AdcSettings::default());
 
     #[cfg(feature = "logging")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap_infallible();
 
-    let mut loop_counter = 0;
+    let mut loop_counter = 0u32;
     loop {
-        unsafe {
-            #[allow(
-                static_mut_refs,
-                reason = "This is needed for main loop timer interrupt"
-            )]
-            while !LOOP_INTERRUPT.load(core::sync::atomic::Ordering::SeqCst) {
-                core::hint::spin_loop()
-            }
-            #[allow(
-                static_mut_refs,
-                reason = "This is needed for main loop timer interrupt"
-            )]
-            LOOP_INTERRUPT.store(false, core::sync::atomic::Ordering::SeqCst);
+        while !LOOP_INTERRUPT.load(Ordering::SeqCst) {
+            use core::hint;
+            hint::spin_loop();
         }
+        LOOP_INTERRUPT.store(false, Ordering::SeqCst);
         if loop_counter == 0 {
             led.toggle();
         }
-        loop_counter += 1;
+        loop_counter = loop_counter.wrapping_add(1);
         loop_counter %= 100;
 
         if let Some(command) = read_serial(&mut state) {
@@ -243,7 +250,7 @@ fn main() -> ! {
 
         #[cfg(feature = "logging")]
         ufmt::uwriteln!(&mut state.serial, "Reading PressureSensor...\r").unwrap_infallible();
-        if let Some(ref pressure_sensor) = pressure_sensor {
+        if let Some(pressure_sensor) = &pressure_sensor {
             if let Some(pressure_data) = pressure_sensor.read(&mut state) {
                 serial::write(
                     &mut state,
@@ -251,26 +258,34 @@ fn main() -> ! {
                         pressure: pressure_data.pressure,
                         temperature: pressure_data.temperature,
                     }),
-                )
+                );
             }
         }
 
         {
             let value = adc.read_blocking(&channel::ADC6);
-            const AVCC: u32 = 5000;
-            let battery_mv = (value as u32 * AVCC) / 1023;
-            serial::write(&mut state, Telemetry::BatteryVoltage(battery_mv))
+            if let Some(temp) = u32::from(value).checked_mul(AVCC) {
+                if let Some(battery_mv) = temp.checked_div(1023) {
+                    serial::write(&mut state, Telemetry::BatteryVoltage(battery_mv));
+                } else {
+                    #[cfg(feature = "logging")]
+                    ufmt::uwriteln!(&mut state.serial, "Failed division to mV\r")
+                        .unwrap_infallible();
+                }
+            } else {
+                #[cfg(feature = "logging")]
+                ufmt::uwriteln!(&mut state.serial, "Failed multiplication with VCCC\r")
+                    .unwrap_infallible();
+            }
         }
     }
 }
 
 #[avr_device::interrupt(atmega328p)]
+#[expect(
+    clippy::single_call_fn,
+    reason = "We need a separate function for an interrupt"
+)]
 fn TIMER1_COMPA() {
-    unsafe {
-        #[allow(
-            static_mut_refs,
-            reason = "This is needed for main loop timer interrupt"
-        )]
-        LOOP_INTERRUPT.store(true, core::sync::atomic::Ordering::SeqCst);
-    }
+    LOOP_INTERRUPT.store(true, Ordering::SeqCst);
 }

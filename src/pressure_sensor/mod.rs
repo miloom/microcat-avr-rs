@@ -1,8 +1,9 @@
 use crate::State;
+use atmega_hal::i2c::Error as I2cError;
 #[cfg(feature = "logging")]
-use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 #[cfg(feature = "logging")]
-use embedded_hal::i2c::{Error, ErrorKind, NoAcknowledgeSource};
+use embedded_hal::i2c::{Error as _, ErrorKind, NoAcknowledgeSource};
 use ms5837_02ba::{Ms5837_02ba, SensorData};
 
 pub struct PressureSensor {
@@ -10,9 +11,9 @@ pub struct PressureSensor {
 }
 
 impl PressureSensor {
-    pub fn new(state: &mut State) -> Result<PressureSensor, atmega_hal::i2c::Error> {
+    pub fn new(state: &mut State) -> Result<Self, I2cError> {
         let ms5837_02ba = Ms5837_02ba::new(&mut state.i2c)?;
-        Ok(PressureSensor { ms5837_02ba })
+        Ok(Self { ms5837_02ba })
     }
 
     pub fn read(&self, state: &mut State) -> Option<SensorData> {

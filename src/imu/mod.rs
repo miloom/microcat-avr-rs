@@ -1,25 +1,19 @@
 use crate::State;
 use atmega_hal::i2c::Error;
 #[cfg(feature = "logging")]
-use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 use core::marker::PhantomData;
-use icm20608g::structs::*;
-
-pub struct ImuMeasurements {
-    pub accel_x: i16, // cm/s^2
-    pub accel_y: i16, // cm/s^2
-    pub accel_z: i16, // cm/s^2
-    pub gyro_x: i16,  // x_angular_rate = gyro_x / 131 LSB(º/s)
-    pub gyro_y: i16,  // y_angular_rate = gyro_y / 131 LSB(º/s)
-    pub gyro_z: i16,  // z_angular_rate = gyro_z / 131 LSB(º/s)
-}
+use icm20608g::structs::{
+    AccelConfig1, AccelConfig2, AccelMeasurements, Config, GyroConfig, GyroOffset,
+    GyroscopeMeasurements, PowerManagement1, ReadRegister as _, WriteRegister as _,
+};
 
 pub struct Imu {
     _phantom: PhantomData<()>,
 }
 
 impl Imu {
-    pub fn new(state: &mut State) -> Imu {
+    pub fn new(state: &mut State) -> Self {
         if let Ok(mut pwr_mgmt) = PowerManagement1::new(&mut state.i2c) {
             #[cfg(feature = "logging")]
             ufmt::uwriteln!(&mut state.serial, "IMU read power management\r").unwrap_infallible();
@@ -97,11 +91,15 @@ impl Imu {
                     .unwrap_infallible();
             }
         }
-        Imu {
-            _phantom: Default::default(),
+        Self {
+            _phantom: PhantomData,
         }
     }
 
+    #[expect(
+        clippy::unused_self,
+        reason = "self is used to require initialization of IMU"
+    )]
     pub fn read(&self, state: &mut State) -> Result<ImuMeasurements, Error> {
         #[cfg(feature = "logging")]
         ufmt::uwriteln!(&mut state.serial, "Reading accel data \r").unwrap_infallible();
@@ -121,4 +119,13 @@ impl Imu {
             gyro_z: gyro_measurements.z,
         })
     }
+}
+
+pub struct ImuMeasurements {
+    pub accel_x: i16, // cm/s^2
+    pub accel_y: i16, // cm/s^2
+    pub accel_z: i16, // cm/s^2
+    pub gyro_x: i16,  // x_angular_rate = gyro_x / 131 LSB(º/s)
+    pub gyro_y: i16,  // y_angular_rate = gyro_y / 131 LSB(º/s)
+    pub gyro_z: i16,  // z_angular_rate = gyro_z / 131 LSB(º/s)
 }

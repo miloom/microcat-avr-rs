@@ -6,7 +6,7 @@ pub struct ToneDetector {
 }
 
 impl ToneDetector {
-    pub fn new(pin: Pin<Input<Floating>>) -> Self {
+    pub const fn new(pin: Pin<Input<Floating>>) -> Self {
         Self { pin }
     }
 

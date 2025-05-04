@@ -2,81 +2,82 @@ use crate::State;
 use atmega_hal::port::mode::Output;
 use atmega_hal::port::Dynamic;
 use atmega_hal::port::Pin;
-use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
-use embedded_hal::spi::SpiBus;
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
+use embedded_hal::spi::SpiBus as _;
 #[cfg(feature = "logging")]
 use ufmt::uwriteln;
 
-pub trait Encoder {
-    fn init(&mut self, state: &mut State) -> Result<(), ()>;
-    fn read(&mut self, state: &mut State) -> i16;
-}
-
-pub(crate) struct As5040 {
+pub struct As5040 {
     pub cs: Pin<Output, Dynamic>,
-    status: u8,
     parity: u8,
+    status: u8,
 }
 
 impl As5040 {
     // defines for 5 bit status value
-    #[allow(
-        dead_code,
-        reason = "These are only needed when writing logic for return codes"
-    )]
-    const AS5040_STATUS_OCF: u16 = 0x10;
-    #[allow(
+    #[expect(
         dead_code,
         reason = "These are only needed when writing logic for return codes"
     )]
     const AS5040_STATUS_COF: u16 = 0x08;
-    #[allow(
+    #[expect(
         dead_code,
         reason = "These are only needed when writing logic for return codes"
     )]
     const AS5040_STATUS_LIN: u16 = 0x04;
-    #[allow(
-        dead_code,
-        reason = "These are only needed when writing logic for return codes"
-    )]
-    const AS5040_STATUS_MAGINC: u16 = 0x02;
-    #[allow(
+    #[expect(
         dead_code,
         reason = "These are only needed when writing logic for return codes"
     )]
     const AS5040_STATUS_MAGDEC: u16 = 0x01;
+    #[expect(
+        dead_code,
+        reason = "These are only needed when writing logic for return codes"
+    )]
+    const AS5040_STATUS_MAGINC: u16 = 0x02;
+    const AS5040_STATUS_OCF: u16 = 0x10;
 
-    pub fn new(cs: Pin<Output, Dynamic>) -> Self {
+    const fn even_parity(val: u8) -> u8 {
+        let val = (val >> 1u8) ^ val;
+        let val = (val >> 2u8) ^ val;
+        let val = (val >> 4u8) ^ val;
+        val & 1u8
+    }
+
+    pub const fn new(cs: Pin<Output, Dynamic>) -> Self {
         Self {
             cs,
             status: 0,
             parity: 0,
         }
     }
+
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "Bitshift will ensure correct behaviour"
+    )]
     fn single_read(&mut self, state: &mut State) -> i16 {
         let mut buffer = [0u8; 2];
         self.cs.set_low();
         state.spi.read(&mut buffer).unwrap_infallible();
         self.cs.set_high();
-        let value = (u16::from_be_bytes(buffer) >> 6) as i16;
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "We use bitshift to guarantee safety"
+        )]
+        let value = (u16::from_be_bytes(buffer) >> 6i16) as i16;
         self.status = buffer[1] & 0x1F;
-        self.parity = Self::even_parity((value >> 2) as u8)
-            ^ Self::even_parity((value & 3) as u8)
+        self.parity = Self::even_parity((value >> 2i16) as u8)
+            ^ Self::even_parity((value & 3i16) as u8)
             ^ Self::even_parity(self.status);
         value
-    }
-
-    fn even_parity(val: u8) -> u8 {
-        let val = (val >> 1) ^ val;
-        let val = (val >> 2) ^ val;
-        let val = (val >> 4) ^ val;
-        val & 1
     }
 }
 
 impl Encoder for As5040 {
+    #[expect(clippy::cast_possible_truncation, reason = "Expected behaviour")]
     fn init(&mut self, state: &mut State) -> Result<(), ()> {
-        let mut count = 0;
+        let mut count = 0u32;
         loop {
             self.single_read(state);
             #[cfg(feature = "logging")]
@@ -87,8 +88,7 @@ impl Encoder for As5040 {
             if count > 30 {
                 return Err(());
             }
-            // delay_ms(1);
-            count += 1;
+            count = count.saturating_add(1);
         }
         Ok(())
     }
@@ -96,4 +96,9 @@ impl Encoder for As5040 {
     fn read(&mut self, state: &mut State) -> i16 {
         self.single_read(state)
     }
+}
+
+pub trait Encoder {
+    fn init(&mut self, state: &mut State) -> Result<(), ()>;
+    fn read(&mut self, state: &mut State) -> i16;
 }

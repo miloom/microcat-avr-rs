@@ -1,0 +1,1 @@
+allowed-duplicate-crates = ["syn", "nb", "embedded-hal"]
