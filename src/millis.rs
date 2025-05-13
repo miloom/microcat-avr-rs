@@ -1,15 +1,16 @@
-use atmega_hal::pac;
+use crate::{CoreClock, State};
+use atmega_hal::port::mode::{Input, Output};
+use atmega_hal::port::{Pin, PD0, PD1};
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
+use atmega_hal::{pac, Usart};
+use avr_device::atmega328p::USART0;
 use avr_device::{interrupt, interrupt::Mutex};
 use core::cell;
+use ufmt::uwriteln;
 
 static MILLIS_COUNTER: Mutex<cell::Cell<u32>> = Mutex::new(cell::Cell::new(0));
 
-#[expect(clippy::unwrap_used, reason = "We allow panics on compile time code")]
-const MILLIS_INCREMENT: u32 = PRESCALER
-    .checked_mul(TIMER_COUNTS)
-    .unwrap()
-    .checked_div(16000)
-    .unwrap();
+const MILLIS_INCREMENT: u32 = PRESCALER * TIMER_COUNTS / 16000;
 const PRESCALER: u32 = 1024;
 const TIMER_COUNTS: u32 = 125;
 

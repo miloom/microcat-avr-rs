@@ -31,7 +31,7 @@ use atmega_hal::prelude::*;
 use cobs::decode;
 use heapless::Vec;
 use micropb::{MessageDecode as _, MessageEncode as _, PbDecoder, PbEncoder};
-#[cfg(feature = "logging")]
+#[cfg(feature = "log")]
 use ufmt::uwriteln;
 
 pub enum Command {
@@ -104,9 +104,7 @@ fn encode_cobs(data: &[u8]) -> ([u8; 128], usize) {
     let len = cobs::encode(data, &mut temporary);
     if let Some(last) = temporary.get_mut(len) {
         *last = 0;
-        if let Some(new_len) = len.checked_add(1) {
-            return (temporary, new_len);
-        }
+        return (temporary, len + 1);
     }
     (temporary, 0)
 }
@@ -122,7 +120,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                 *last = 0;
             } else {
                 state.serial_buf_idx = 0;
-                #[cfg(feature = "logging")]
+                #[cfg(feature = "log-info")]
                 uwriteln!(&mut state.serial, "Failed to write last byte for message")
                     .unwrap_infallible();
                 return None;
@@ -153,7 +151,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                                 }
                                 _ => {
                                     state.serial_buf_idx = 0;
-                                    #[cfg(feature = "logging")]
+                                    #[cfg(feature = "log-info")]
                                     uwriteln!(&mut state.serial, "Failed to decode motor location")
                                         .unwrap_infallible();
                                     return None;
@@ -177,80 +175,78 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                     };
                 }
             } else {
-                #[cfg(feature = "logging")]
+                #[cfg(feature = "log-info")]
                 uwriteln!(&mut state.serial, "Failed to decode using cobs\r").unwrap_infallible();
             }
 
             state.serial_buf_idx = 0;
         } else if let Some(last) = state.serial_buf.get_mut(state.serial_buf_idx) {
             *last = data;
-            if let Some(new_idx) = state.serial_buf_idx.checked_add(1) {
-                state.serial_buf_idx = new_idx;
-            }
+            state.serial_buf_idx += 1;
         }
     }
     None
 }
 
 pub fn write(state: &mut State, telemetry: Telemetry) {
-    #[cfg(feature = "logging")]
-    uwriteln!(&mut state.serial, "Serial Write\r").unwrap();
-    let message = proto::message_::Message {
-        data: Some(match telemetry {
-            Telemetry::Imu(reading) => {
-                let mut data = proto::imu_::Telemetry::default();
-                data.set_accel(proto::imu_::AccelData {
-                    x: i32::from(reading.accel_x),
-                    y: i32::from(reading.accel_y),
-                    z: i32::from(reading.accel_z),
-                });
-                data.set_gyro(proto::imu_::GyroData {
-                    x: i32::from(reading.gyro_x),
-                    y: i32::from(reading.gyro_y),
-                    z: i32::from(reading.gyro_z),
-                });
-                proto::message_::Message_::Data::Imu(data)
+    {
+        let message = proto::message_::Message {
+            data: Some(match telemetry {
+                Telemetry::Imu(reading) => {
+                    let mut data = proto::imu_::Telemetry::default();
+                    data.set_accel(proto::imu_::AccelData {
+                        x: i32::from(reading.accel_x),
+                        y: i32::from(reading.accel_y),
+                        z: i32::from(reading.accel_z),
+                    });
+                    data.set_gyro(proto::imu_::GyroData {
+                        x: i32::from(reading.gyro_x),
+                        y: i32::from(reading.gyro_y),
+                        z: i32::from(reading.gyro_z),
+                    });
+                    proto::message_::Message_::Data::Imu(data)
+                }
+                Telemetry::MotorPosition(position) => {
+                    let data = proto::motor_::MotorPosition {
+                        position: i32::from(position.position),
+                        location: match position.location {
+                            crate::MotorLocation::RearLeft => proto::motor_::Location::BackLeft,
+                            crate::MotorLocation::FrontLeft => proto::motor_::Location::FrontLeft,
+                            crate::MotorLocation::FrontRight => proto::motor_::Location::FrontRight,
+                            crate::MotorLocation::RearRight => proto::motor_::Location::BackRight,
+                        },
+                    };
+                    proto::message_::Message_::Data::MotorPosition(data)
+                }
+                Telemetry::ToneDetector(tone_detector) => {
+                    let data = proto::tone_detector_::ToneDetectorStatus {
+                        location: match tone_detector.location {
+                            ToneDetectorLocation::Left => proto::tone_detector_::Location::Left,
+                            ToneDetectorLocation::Right => proto::tone_detector_::Location::Right,
+                        },
+                        is_high: tone_detector.is_high,
+                    };
+                    proto::message_::Message_::Data::ToneDetectorStatus(data)
+                }
+                Telemetry::PressureData(data) => {
+                    let data = proto::pressure_::PressureData {
+                        pressure: data.pressure,
+                        temperature: data.temperature,
+                    };
+                    proto::message_::Message_::Data::PressureData(data)
+                }
+                Telemetry::BatteryVoltage(voltage) => {
+                    proto::message_::Message_::Data::BatterVoltage(voltage)
+                }
+            }),
+        };
+        let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());
+        if message.encode(&mut encoder).is_ok() {
+            let writer = encoder.into_writer();
+            let (cobs_encoded, len) = crate::serial::encode_cobs(&writer);
+            for data in cobs_encoded.iter().take(len) {
+                state.serial.write_byte(*data);
             }
-            Telemetry::MotorPosition(position) => {
-                let data = proto::motor_::MotorPosition {
-                    position: i32::from(position.position),
-                    location: match position.location {
-                        crate::MotorLocation::RearLeft => proto::motor_::Location::BackLeft,
-                        crate::MotorLocation::FrontLeft => proto::motor_::Location::FrontLeft,
-                        crate::MotorLocation::FrontRight => proto::motor_::Location::FrontRight,
-                        crate::MotorLocation::RearRight => proto::motor_::Location::BackRight,
-                    },
-                };
-                proto::message_::Message_::Data::MotorPosition(data)
-            }
-            Telemetry::ToneDetector(tone_detector) => {
-                let data = proto::tone_detector_::ToneDetectorStatus {
-                    location: match tone_detector.location {
-                        ToneDetectorLocation::Left => proto::tone_detector_::Location::Left,
-                        ToneDetectorLocation::Right => proto::tone_detector_::Location::Right,
-                    },
-                    is_high: tone_detector.is_high,
-                };
-                proto::message_::Message_::Data::ToneDetectorStatus(data)
-            }
-            Telemetry::PressureData(data) => {
-                let data = proto::pressure_::PressureData {
-                    pressure: data.pressure,
-                    temperature: data.temperature,
-                };
-                proto::message_::Message_::Data::PressureData(data)
-            }
-            Telemetry::BatteryVoltage(voltage) => {
-                proto::message_::Message_::Data::BatterVoltage(voltage)
-            }
-        }),
-    };
-    let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());
-    if message.encode(&mut encoder).is_ok() {
-        let writer = encoder.into_writer();
-        let (cobs_encoded, len) = encode_cobs(&writer);
-        for data in cobs_encoded.iter().take(len) {
-            state.serial.write_byte(*data);
         }
     }
 }

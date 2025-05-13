@@ -60,7 +60,10 @@ opt-level = "s"
 overflow-checks = false # https://github.com/Rahix/avr-hal/issues/131
 
 [features]
-logging = []
+log = []
+log-info = ["log"]
+log-debug = ["log-info"]
+log-trace = ["log-debug"]
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }

@@ -26,9 +26,9 @@ impl IntegerPID {
     )]
     pub fn new(kp: f32, ki: f32, kd: f32, scale: i16, output_min: i32, output_max: i32) -> Self {
         Self {
-            kp: kp.mul(f32::from(scale)) as i32,
-            ki: ki.mul(f32::from(scale)) as i32,
-            kd: kd.mul(f32::from(scale)) as i32,
+            kp: (kp * f32::from(scale)) as i32,
+            ki: (ki * f32::from(scale)) as i32,
+            kd: (kd * f32::from(scale)) as i32,
             scale,
             prev_error: 0,
             integral: 0,
@@ -46,8 +46,8 @@ impl IntegerPID {
         reason = "This truncating is expected"
     )]
     pub fn p(&mut self, kp: f32, max: f32) -> &mut Self {
-        self.kp = kp.mul(f32::from(self.scale)) as i32;
-        self.p_max = max.mul(f32::from(self.scale)) as i32;
+        self.kp = (kp * f32::from(self.scale)) as i32;
+        self.p_max = (max * f32::from(self.scale)) as i32;
         self
     }
 
@@ -57,8 +57,8 @@ impl IntegerPID {
         reason = "This truncating is expected"
     )]
     pub fn i(&mut self, ki: f32, max: f32) -> &mut Self {
-        self.ki = ki.mul(f32::from(self.scale)) as i32;
-        self.i_max = max.mul(f32::from(self.scale)) as i32;
+        self.ki = (ki * f32::from(self.scale)) as i32;
+        self.i_max = (max * f32::from(self.scale)) as i32;
         self
     }
 
@@ -68,8 +68,8 @@ impl IntegerPID {
         reason = "This truncating is expected"
     )]
     pub fn d(&mut self, kd: f32, max: f32) -> &mut Self {
-        self.kd = kd.mul(f32::from(self.scale)) as i32;
-        self.d_max = max.mul(f32::from(self.scale)) as i32;
+        self.kd = (kd * f32::from(self.scale)) as i32;
+        self.d_max = (max * f32::from(self.scale)) as i32;
         self
     }
 
@@ -79,30 +79,19 @@ impl IntegerPID {
     )]
     pub fn compute(&mut self, error: i32) -> f32 {
         // Proportional term
-        let p_term = self
-            .kp
-            .saturating_mul(error)
-            .clamp(self.p_max.neg(), self.p_max);
+        let p_term = (self.kp * error).clamp(self.p_max.neg(), self.p_max);
 
         // Integral term (with clamping to prevent integral windup)
-        self.integral = self
-            .integral
-            .saturating_add(error)
-            .clamp(self.i_max.neg(), self.i_max);
-        let i_term = self
-            .ki
-            .saturating_mul(self.integral)
-            .clamp(self.i_max.neg(), self.i_max);
+        self.integral = (self.integral + error).clamp(self.i_max.neg(), self.i_max);
+        let i_term = (self.ki * self.integral).clamp(self.i_max.neg(), self.i_max);
 
         // Derivative term
-        let d_term = self
-            .kd
-            .saturating_mul(error.saturating_sub(self.prev_error))
-            .clamp(self.d_max.neg(), self.d_max);
+        let d_term =
+            (self.kd * error.saturating_sub(self.prev_error)).clamp(self.d_max.neg(), self.d_max);
         self.prev_error = error;
 
         // Compute the output
-        let mut output = p_term.saturating_add(i_term).saturating_add(d_term);
+        let mut output = p_term + i_term + d_term;
 
         // Clamp the output to the limits
         output = output.clamp(self.output_min, self.output_max);

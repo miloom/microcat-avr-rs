@@ -1,8 +1,8 @@
 use crate::State;
 use atmega_hal::i2c::Error as I2cError;
-#[cfg(feature = "logging")]
+#[cfg(feature = "log")]
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
-#[cfg(feature = "logging")]
+#[cfg(feature = "log")]
 use embedded_hal::i2c::{Error as _, ErrorKind, NoAcknowledgeSource};
 use ms5837_02ba::{Ms5837_02ba, SensorData};
 
@@ -17,11 +17,11 @@ impl PressureSensor {
     }
 
     pub fn read(&self, state: &mut State) -> Option<SensorData> {
-        #[cfg(feature = "logging")]
+        #[cfg(feature = "log-trace")]
         ufmt::uwriteln!(&mut state.serial, "Reading pressure...\r").unwrap_infallible();
         let temp = self.ms5837_02ba.read(&mut state.i2c);
         if let Ok(data) = temp {
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log-trace")]
             ufmt::uwriteln!(
                 &mut state.serial,
                 "Got OK {}\r",
@@ -30,9 +30,9 @@ impl PressureSensor {
             .unwrap_infallible();
             return data;
         }
-        #[cfg(feature = "logging")]
+        #[cfg(feature = "log")]
         if let Some(error_ret) = temp.err() {
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log-info")]
             ufmt::uwriteln!(
                 &mut state.serial,
                 "Got error {} {}\r",

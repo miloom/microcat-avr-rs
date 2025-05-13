@@ -4,7 +4,7 @@ use atmega_hal::port::Dynamic;
 use atmega_hal::port::Pin;
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 use embedded_hal::spi::SpiBus as _;
-#[cfg(feature = "logging")]
+#[cfg(feature = "log")]
 use ufmt::uwriteln;
 
 pub struct As5040 {
@@ -80,7 +80,7 @@ impl Encoder for As5040 {
         let mut count = 0u32;
         loop {
             self.single_read(state);
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log-debug")]
             uwriteln!(&mut state.serial, "Status: {:x}\r", self.status).unwrap_infallible();
             if self.status & Self::AS5040_STATUS_OCF as u8 != 0 {
                 break;

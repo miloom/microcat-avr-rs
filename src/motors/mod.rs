@@ -7,14 +7,13 @@ use crate::State;
 use as5040::{As5040, Encoder as _};
 use atmega_hal::port::mode::Output;
 use atmega_hal::port::Pin;
-#[cfg(feature = "logging")]
+#[cfg(feature = "log")]
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 use core::f32::consts::PI;
-use core::ops::{Div as _, Mul as _, Neg as _};
 use drv8830::WriteRegister as _;
 use micromath::F32Ext as _;
 use strum::EnumIter;
-#[cfg(feature = "logging")]
+#[cfg(feature = "log")]
 use ufmt::uwriteln;
 
 pub struct MotorController {
@@ -42,7 +41,7 @@ impl MotorController {
         .write(&mut state.i2c, self.location.i2c_address());
 
         let limited_speed = f32::from(speed.abs().min(Self::MAX_SERVO_SPEED));
-        let speed_target = limited_speed.div(100.0);
+        let speed_target = limited_speed / 100.0;
         let mut control = if speed_target.abs() < 0.1 {
             drv8830::Control::BRAKE
         } else if speed > 0 {
@@ -60,7 +59,7 @@ impl MotorController {
 
     pub fn init(&mut self, state: &mut State) {
         if self.encoder.init(state).is_err() {
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log")]
             uwriteln!(
                 &mut state.serial,
                 "Failed to init {} encoder \r",
@@ -93,16 +92,14 @@ impl MotorController {
         let frequency_float = self.frequency as f32;
         let amplitude_float = self.amplitude as f32;
         // calculate generalized angular position based on amplitude and frequency
-        let time = (millis() as f32).div(1000.0);
+        let time = (millis() as f32) / 1000.0;
         let period = frequency_float.inv();
         let temp_time = fmodf(time, period);
-        let gen_xt: f32 = amplitude_float
-            .div(2.0)
-            .mul(TWO_PI.mul(frequency_float).mul(temp_time).sin());
+        let gen_xt: f32 = amplitude_float / 2.0 * (2.0 * PI * frequency_float * temp_time).sin();
 
         let desired_position = self.target_position.wrapping_add(gen_xt as i32);
         let desired_position = if self.reversed {
-            desired_position.neg()
+            -desired_position
         } else {
             desired_position
         };
@@ -126,9 +123,9 @@ impl MotorController {
 
         // Wrap into [-MAX/2, MAX/2]
         if angle > half_max {
-            angle = angle.checked_sub(max)?;
-        } else if angle < half_max.neg() {
-            angle = angle.checked_add(max)?;
+            angle -= max;
+        } else if angle < -half_max {
+            angle += max;
         }
 
         Some(angle)
@@ -163,7 +160,7 @@ impl MotorLocation {
     }
 
     #[cfg_attr(
-        not(feature = "logging"),
+        not(feature = "log"),
         expect(dead_code, reason = "Used for easier logging")
     )]
     pub const fn to_str(self) -> &'static str {

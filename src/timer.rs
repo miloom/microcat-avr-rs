@@ -28,15 +28,7 @@ pub const fn calc_overflow(clock_hz: u32, target_hz: u32, prescale: u32) -> u32 
     https://github.com/Rahix/avr-hal/issues/75
     reversing the formula F = 16 MHz / (256 * (1 + 15624)) = 4 Hz
      */
-    #[expect(
-        clippy::unwrap_used,
-        reason = "This function can only be called from const context"
-    )]
-    clock_hz
-        .checked_div(target_hz)
-        .unwrap()
-        .checked_div(prescale.checked_sub(1).unwrap())
-        .unwrap()
+    clock_hz / target_hz / prescale - 1
 }
 
 pub fn rig_timer(tmr1: &TC1) {
@@ -60,7 +52,7 @@ pub fn rig_timer(tmr1: &TC1) {
         clippy::cast_possible_truncation,
         reason = "We manually checked that the cast will not truncate"
     )]
-    const TICKS: u16 = const_int_cast!(calc_overflow(CORE_CLOCK_FREQ, 1, CLOCK_DIVISOR), u16);
+    const TICKS: u16 = calc_overflow(CORE_CLOCK_FREQ, 10, CLOCK_DIVISOR) as u16;
 
     tmr1.tccr1a.write(|w| w.wgm1().bits(0b00));
     tmr1.tccr1b.write(|w| {
