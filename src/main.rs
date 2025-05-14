@@ -151,7 +151,7 @@ fn main() -> ! {
     // SAFETY: We will never remove the pin from this motor and the motor will never turn it into input so this is safe.
     unsafe {
         motor_system.initialize(
-            MotorLocation::RearLeft,
+            MotorLocation::RearRight,
             d10.into_pin_unchecked().downgrade(),
             &mut state,
         );

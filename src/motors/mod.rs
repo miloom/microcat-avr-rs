@@ -72,11 +72,11 @@ impl MotorController {
         Self {
             encoder: As5040::new(cs),
             location,
-            frequency: 200,
-            amplitude: 100,
+            frequency: 500,
+            amplitude: 0,
             reversed: false,
             target_position: 0,
-            pid: IntegerPID::new(0.9, 0.05, 0.0, 100, -100, 100),
+            pid: IntegerPID::new(0.6, 0.0, 0.0, 100, -100, 100),
         }
     }
 
