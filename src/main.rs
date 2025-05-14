@@ -23,12 +23,10 @@ use atmega_hal::port::mode::{Input, Output};
 use atmega_hal::port::{Pin, PD0, PD1};
 #[cfg(feature = "log")]
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
-use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
 use atmega_hal::spi;
 use atmega_hal::usart::Baudrate;
 use atmega_hal::{adc, adc::channel};
 use atmega_hal::{I2c, Spi, Usart};
-use avr_device::asm::delay_cycles;
 use avr_device::atmega328p::TC1;
 use core::sync::atomic::AtomicBool;
 use core::sync::atomic::Ordering;

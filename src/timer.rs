@@ -1,28 +1,6 @@
 use avr_device::atmega328p::tc1::tccr1b::CS1_A;
 use avr_device::atmega328p::TC1;
 
-macro_rules! const_int_cast {
-    ($value:expr, $to:ty) => {{
-        const OUT: $to = {
-            // Validate 128-bit is not used
-            #[expect(
-                clippy::indexing_slicing,
-                reason = "We want it to panic if we use 128-bit types"
-            )]
-            const _: () = [()][(core::mem::size_of::<$to>() == 16
-                || core::mem::size_of_val(&$value) == 16) as usize];
-            // Bounds check
-            const _: () = assert!(
-                ($value as i128) >= <$to>::MIN as i128 && ($value as i128) <= <$to>::MAX as i128,
-                "const_int_cast: value out of bounds"
-            );
-
-            $value as $to
-        };
-        OUT
-    }};
-}
-
 pub const fn calc_overflow(clock_hz: u32, target_hz: u32, prescale: u32) -> u32 {
     /*
     https://github.com/Rahix/avr-hal/issues/75

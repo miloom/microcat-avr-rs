@@ -1,12 +1,6 @@
-use crate::{CoreClock, State};
-use atmega_hal::port::mode::{Input, Output};
-use atmega_hal::port::{Pin, PD0, PD1};
-use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible;
-use atmega_hal::{pac, Usart};
-use avr_device::atmega328p::USART0;
+use atmega_hal::pac;
 use avr_device::{interrupt, interrupt::Mutex};
 use core::cell;
-use ufmt::uwriteln;
 
 static MILLIS_COUNTER: Mutex<cell::Cell<u32>> = Mutex::new(cell::Cell::new(0));
 

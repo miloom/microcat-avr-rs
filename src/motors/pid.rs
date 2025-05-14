@@ -3,7 +3,7 @@
     reason = "Many locations make more sense to be ordered by P, I, D"
 )]
 
-use core::ops::{Div as _, Mul as _, Neg as _};
+use core::ops::{Div as _, Neg as _};
 
 pub struct IntegerPID {
     kp: i32,         // Proportional coefficient (scaled)
