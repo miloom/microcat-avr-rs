@@ -95,7 +95,7 @@ impl MotorController {
         let time = (millis() as f32) / 1000.0;
         let period = frequency_float.inv();
         let temp_time = fmodf(time, period);
-        let gen_xt: f32 = amplitude_float / 2.0 * (2.0 * PI * frequency_float * temp_time).sin();
+        let gen_xt: f32 = amplitude_float / 2.0 * (TWO_PI * frequency_float * temp_time).sin();
 
         let desired_position = self.target_position.wrapping_add(gen_xt as i32);
         let desired_position = if self.reversed {

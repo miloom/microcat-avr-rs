@@ -62,8 +62,6 @@ struct State {
     reason = "Main will always be called only once"
 )]
 fn main() -> ! {
-    const AVCC: u32 = 5000;
-
     #[expect(
         clippy::unwrap_used,
         reason = "We require peripherals to be able to run any logic"
@@ -267,9 +265,13 @@ fn main() -> ! {
 
         {
             let value = adc.read_blocking(&channel::ADC6);
+            const VREF: u32 = 1100; // mV
+            let pin_voltage = u32::from(value) * VREF / 1023; // mV
+            const VOLTAGE_DIVIDER_MULT: u32 = 9393; // Scaled up by 1000
+
             serial::write(
                 &mut state,
-                Telemetry::BatteryVoltage(u32::from(value) * AVCC / 1023),
+                Telemetry::BatteryVoltage(pin_voltage * VOLTAGE_DIVIDER_MULT / 1000),
             );
         }
     }
