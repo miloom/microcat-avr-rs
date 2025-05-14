@@ -17,7 +17,7 @@ bench = false
 [dependencies]
 panic-halt = "0.2.0"
 ufmt = "0.2.0"
-cobs = { version = "0.2.3", default-features = false }
+cobs = { version = "0.3.0", default-features = false }
 heapless = "0.8.0"
 micropb = { version = "0.1.0", features = ["container-heapless"] }
 drv8830 = { git = "https://github.com/miloom/drv8830.git" }
@@ -41,8 +41,8 @@ micropb-gen = { version = "0.1.0", features = ["format"] }
 # The latest releases of `proc-macro2` do not support the rust toolchain that
 # we use.  Thus, we must fix this dependency to an older version where our
 # toolchain is still supported.  See https://github.com/Rahix/avr-hal/issues/537
-[build-dependencies.proc-macro2]
-version = "=1.0.79"
+#[build-dependencies.proc-macro2]
+#version = "=1.0.79"
 
 # Configure the build for minimal size - AVRs have very little program memory
 [profile.dev]
