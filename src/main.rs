@@ -16,12 +16,12 @@ mod tone_detector;
 
 use atmega_hal::adc::AdcSettings;
 use atmega_hal::clock;
-#[cfg(feature = "log")]
+#[cfg(feature = "log_debug")]
 use atmega_hal::i2c::Direction;
 use atmega_hal::pac::USART0;
 use atmega_hal::port::mode::{Input, Output};
 use atmega_hal::port::{Pin, PD0, PD1};
-#[cfg(feature = "log")]
+#[cfg(feature = "log_info")]
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 use atmega_hal::spi;
 use atmega_hal::usart::Baudrate;
@@ -69,7 +69,7 @@ fn main() -> ! {
     let mut led = pins.pc0.into_output();
 
     #[cfg_attr(
-        not(feature = "log"),
+        not(feature = "log_info"),
         expect(unused_mut, reason = "This mut is only needed with logging macro")
     )]
     let mut serial = Usart::new(
@@ -79,11 +79,11 @@ fn main() -> ! {
         Baudrate::<CoreClock>::new(115_200),
     );
     led.set_high();
-    #[cfg(feature = "log-info")]
+    #[cfg(feature = "log_info")]
     ufmt::uwriteln!(&mut serial, "Setup...\r").unwrap_infallible();
 
     millis::init(&dp.TC0);
-    #[cfg(feature = "log-trace")]
+    #[cfg(feature = "log_trace")]
     ufmt::uwriteln!(&mut serial, "Millis done...\r").unwrap_infallible();
 
     let tmr1: TC1 = dp.TC1;
@@ -117,12 +117,12 @@ fn main() -> ! {
             },
         },
     );
-    #[cfg(feature = "log-trace")]
+    #[cfg(feature = "log_trace")]
     ufmt::uwriteln!(&mut serial, "SPI done...\r").unwrap_infallible();
 
     let mut motor_power = pins.pc3.into_output();
     motor_power.set_high();
-    #[cfg(feature = "log-trace")]
+    #[cfg(feature = "log_trace")]
     ufmt::uwriteln!(&mut serial, "Motor Power done...\r").unwrap_infallible();
 
     let mut state = State {
@@ -158,12 +158,12 @@ fn main() -> ! {
     };
 
     let imu = imu::Imu::new(&mut state);
-    #[cfg(feature = "log-trace")]
+    #[cfg(feature = "log_trace")]
     ufmt::uwriteln!(&mut state.serial, "IMU Done...\r").unwrap_infallible();
 
     let right_tone_detector = tone_detector::ToneDetector::new(pins.pd4.downgrade());
     let left_tone_detector = tone_detector::ToneDetector::new(pins.pd5.downgrade());
-    #[cfg(feature = "log-debug")]
+    #[cfg(feature = "log_debug")]
     state
         .i2c
         .i2cdetect(&mut state.serial, Direction::Write)
@@ -173,7 +173,7 @@ fn main() -> ! {
 
     let mut adc = Adc::new(dp.ADC, AdcSettings::default());
 
-    #[cfg(feature = "log-info")]
+    #[cfg(feature = "log_info")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap_infallible();
 
     let mut loop_counter = 0u32;
@@ -210,10 +210,10 @@ fn main() -> ! {
             }
         }
 
-        #[cfg(feature = "log-trace")]
+        #[cfg(feature = "log_trace")]
         ufmt::uwriteln!(&mut state.serial, "Reading IMU...\r").unwrap_infallible();
         if let Ok(imu_measurements) = imu.read(&mut state) {
-            #[cfg(feature = "log-trace")]
+            #[cfg(feature = "log_trace")]
             ufmt::uwriteln!(&mut state.serial, "IMU Read...\r").unwrap_infallible();
             serial::write(
                 &mut state,
@@ -227,10 +227,10 @@ fn main() -> ! {
                 }),
             );
         } else {
-            #[cfg(feature = "log-debug")]
+            #[cfg(feature = "log_debug")]
             ufmt::uwriteln!(&mut state.serial, "Reading IMU failed\r").unwrap_infallible();
         }
-        #[cfg(feature = "log-trace")]
+        #[cfg(feature = "log_trace")]
         ufmt::uwriteln!(&mut state.serial, "Reading ToneDetectors...\r").unwrap_infallible();
         serial::write(
             &mut state,
@@ -247,7 +247,7 @@ fn main() -> ! {
             }),
         );
 
-        #[cfg(feature = "log-trace")]
+        #[cfg(feature = "log_trace")]
         ufmt::uwriteln!(&mut state.serial, "Reading PressureSensor...\r").unwrap_infallible();
         if let Some(pressure_sensor) = &pressure_sensor {
             if let Some(pressure_data) = pressure_sensor.read(&mut state) {

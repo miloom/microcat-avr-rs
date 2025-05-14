@@ -31,7 +31,7 @@ use atmega_hal::prelude::*;
 use cobs::decode;
 use heapless::Vec;
 use micropb::{MessageDecode as _, MessageEncode as _, PbDecoder, PbEncoder};
-#[cfg(feature = "log")]
+#[cfg(feature = "log_info")]
 use ufmt::uwriteln;
 
 pub enum Command {
@@ -120,7 +120,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                 *last = 0;
             } else {
                 state.serial_buf_idx = 0;
-                #[cfg(feature = "log-info")]
+                #[cfg(feature = "log_info")]
                 uwriteln!(&mut state.serial, "Failed to write last byte for message")
                     .unwrap_infallible();
                 return None;
@@ -151,7 +151,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                                 }
                                 _ => {
                                     state.serial_buf_idx = 0;
-                                    #[cfg(feature = "log-info")]
+                                    #[cfg(feature = "log_info")]
                                     uwriteln!(&mut state.serial, "Failed to decode motor location")
                                         .unwrap_infallible();
                                     return None;
@@ -175,7 +175,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                     };
                 }
             } else {
-                #[cfg(feature = "log-info")]
+                #[cfg(feature = "log_info")]
                 uwriteln!(&mut state.serial, "Failed to decode using cobs\r").unwrap_infallible();
             }
 
