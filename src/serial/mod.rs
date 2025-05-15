@@ -29,6 +29,7 @@ mod proto;
 use crate::State;
 use atmega_hal::prelude::*;
 use cobs::decode;
+use core::str::FromStr;
 use heapless::Vec;
 use micropb::{MessageDecode as _, MessageEncode as _, PbDecoder, PbEncoder};
 #[cfg(feature = "log_info")]
@@ -70,6 +71,7 @@ pub enum Telemetry {
     MotorPosition(MotorPosition),
     PressureData(PressureValues),
     ToneDetector(ToneDetectorStatus),
+    Debug(::micropb::heapless::String<16>),
 }
 
 pub enum ToneDetectorLocation {
@@ -134,19 +136,48 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                     return None;
                 };
 
+            if let Ok(msg) = micropb::heapless::String::from_str("COBS") {
+                write(state, Telemetry::Debug(msg));
+            }
             if let Some(cobs_decoded_data) = cobs_decoded_data {
                 if let Some(msg) = decode_proto(&cobs_decoded_data) {
                     match msg.data {
                         Some(proto::message_::Message_::Data::MotorTarget(target)) => {
+                            if let Ok(msg) = micropb::heapless::String::from_str("MOTOR TARGET") {
+                                write(state, Telemetry::Debug(msg));
+                            }
+
                             let location = match target.location {
                                 proto::motor_::Location::FrontLeft => {
+                                    if let Ok(msg) =
+                                        micropb::heapless::String::from_str("LOCATION FL")
+                                    {
+                                        write(state, Telemetry::Debug(msg));
+                                    }
                                     crate::MotorLocation::FrontLeft
                                 }
                                 proto::motor_::Location::FrontRight => {
+                                    if let Ok(msg) =
+                                        micropb::heapless::String::from_str("LOCATION FR")
+                                    {
+                                        write(state, Telemetry::Debug(msg));
+                                    }
                                     crate::MotorLocation::FrontRight
                                 }
-                                proto::motor_::Location::BackLeft => crate::MotorLocation::RearLeft,
+                                proto::motor_::Location::BackLeft => {
+                                    if let Ok(msg) =
+                                        micropb::heapless::String::from_str("LOCATION RL")
+                                    {
+                                        write(state, Telemetry::Debug(msg));
+                                    }
+                                    crate::MotorLocation::RearLeft
+                                }
                                 proto::motor_::Location::BackRight => {
+                                    if let Ok(msg) =
+                                        micropb::heapless::String::from_str("LOCATION RR")
+                                    {
+                                        write(state, Telemetry::Debug(msg));
+                                    }
                                     crate::MotorLocation::RearRight
                                 }
                                 _ => {
@@ -169,7 +200,8 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                             | proto::message_::Message_::Data::MotorPosition(_)
                             | proto::message_::Message_::Data::ToneDetectorStatus(_)
                             | proto::message_::Message_::Data::PressureData(_)
-                            | proto::message_::Message_::Data::BatterVoltage(_),
+                            | proto::message_::Message_::Data::BatterVoltage(_)
+                            | proto::message_::Message_::Data::DebugMessage(_),
                         )
                         | None => {}
                     };
@@ -238,6 +270,7 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
                 Telemetry::BatteryVoltage(voltage) => {
                     proto::message_::Message_::Data::BatterVoltage(voltage)
                 }
+                Telemetry::Debug(msg) => proto::message_::Message_::Data::DebugMessage(msg),
             }),
         };
         let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());

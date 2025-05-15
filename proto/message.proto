@@ -15,5 +15,6 @@ message Message {
         tone_detector.ToneDetectorStatus tone_detector_status = 4;
         pressure.PressureData pressure_data = 5;
         uint32 batter_voltage = 6; // Measured battery voltage in mV
+        string debug_message = 7;
     }
 }

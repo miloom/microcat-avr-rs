@@ -183,12 +183,13 @@ fn main() -> ! {
         }
         LOOP_INTERRUPT.store(false, Ordering::SeqCst);
         if loop_counter == 0 {
-            led.toggle();
+            // led.toggle();
         }
         loop_counter = loop_counter.wrapping_add(1);
         loop_counter %= 100;
 
         if let Some(command) = read_serial(&mut state) {
+            led.toggle();
             match command {
                 Command::MotorCommand(command) => {
                     if let Some(motor) = motor_system.get_motor_mut(command.location) {

@@ -87,6 +87,7 @@ impl MotorController {
     )]
     pub fn update(&mut self, state: &mut State) {
         const ENCODER_MAX: i16 = 512; // Assumes range 0 - max
+        const DEG_TO_ENCODER_MUL: i32 = ENCODER_MAX as i32 / 360;
         const TWO_PI: f32 = PI * 2.0;
 
         let frequency_float = self.frequency as f32;
@@ -97,7 +98,8 @@ impl MotorController {
         let temp_time = fmodf(time, period);
         let gen_xt: f32 = amplitude_float / 2.0 * (TWO_PI * frequency_float * temp_time).sin();
 
-        let desired_position = self.target_position.wrapping_add(gen_xt as i32);
+        let desired_position =
+            (self.target_position * DEG_TO_ENCODER_MUL).wrapping_add(gen_xt as i32);
         let desired_position = if self.reversed {
             -desired_position
         } else {
