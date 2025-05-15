@@ -122,6 +122,9 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                 *last = 0;
             } else {
                 state.serial_buf_idx = 0;
+                if let Ok(msg) = micropb::heapless::String::from_str("FAILED BUF") {
+                    write(state, Telemetry::Debug(msg));
+                }
                 #[cfg(feature = "log_info")]
                 uwriteln!(&mut state.serial, "Failed to write last byte for message")
                     .unwrap_infallible();
@@ -132,6 +135,9 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                 if let Some(bytes) = state.serial_buf.get_mut(..=state.serial_buf_idx) {
                     decode_cobs(bytes)
                 } else {
+                    if let Ok(msg) = micropb::heapless::String::from_str("FAILED COBS") {
+                        write(state, Telemetry::Debug(msg));
+                    }
                     state.serial_buf_idx = 0;
                     return None;
                 };

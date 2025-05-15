@@ -71,3 +71,4 @@ pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
 cargo = { level = "warn", priority = -1 }
 items-after-statements = { level = "allow" }
+too-many-lines = { level = "allow" }
