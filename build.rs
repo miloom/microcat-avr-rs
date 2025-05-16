@@ -11,7 +11,7 @@
 )]
 #![allow(clippy::use_debug, reason = "Allows for easier printing")]
 
-use micropb_gen::config::OptionalRepr;
+use micropb_gen::config::{IntSize, OptionalRepr};
 use micropb_gen::Config;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
@@ -46,7 +46,16 @@ fn main() {
     gen.use_container_heapless();
     gen.configure(".", Config::new().optional_repr(OptionalRepr::Option));
     gen.add_protoc_arg(format!("--proto_path={PROTO_DIR}"));
-    gen.configure(".", micropb_gen::Config::new().max_len(8).max_bytes(16));
+    gen.configure(
+        ".",
+        micropb_gen::Config::new()
+            .max_len(2)
+            .max_bytes(4)
+            .enum_int_size(IntSize::S8)
+            .no_clone_impl(true)
+            .no_debug_impl(true)
+            .no_partial_eq_impl(true),
+    );
     gen.format(true);
     gen.compile_protos(&proto_files, "src/serial/proto.rs")
         .unwrap();

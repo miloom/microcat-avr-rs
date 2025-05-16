@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package sync;
+
+message Initialize {
+  int64 t1_ms = 1;
+}
+
+message Response {
+  int64 delay_ms = 1;
+  int64 t3_ms = 2;
+}

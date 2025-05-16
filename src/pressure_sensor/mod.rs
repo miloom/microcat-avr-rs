@@ -17,52 +17,9 @@ impl PressureSensor {
     }
 
     pub fn read(&self, state: &mut State) -> Option<SensorData> {
-        #[cfg(feature = "log_trace")]
-        ufmt::uwriteln!(&mut state.serial, "Reading pressure...\r").unwrap_infallible();
         let temp = self.ms5837_02ba.read(&mut state.i2c);
         if let Ok(data) = temp {
-            #[cfg(feature = "log_trace")]
-            ufmt::uwriteln!(
-                &mut state.serial,
-                "Got OK {}\r",
-                if data.is_none() { "NONE" } else { "SOME" }
-            )
-            .unwrap_infallible();
             return data;
-        }
-        #[cfg(feature = "log_info")]
-        if let Some(error_ret) = temp.err() {
-            #[cfg(feature = "log_info")]
-            ufmt::uwriteln!(
-                &mut state.serial,
-                "Got error {} {}\r",
-                match error_ret.0.kind() {
-                    ErrorKind::Bus => {
-                        "Bus"
-                    }
-                    ErrorKind::ArbitrationLoss => {
-                        "ArbitrationLoss"
-                    }
-                    ErrorKind::NoAcknowledge(source) => {
-                        match source {
-                            NoAcknowledgeSource::Address => "No ACK Address",
-                            NoAcknowledgeSource::Data => "No ACK Data",
-                            NoAcknowledgeSource::Unknown => "No ACK Unknown",
-                        }
-                    }
-                    ErrorKind::Overrun => {
-                        "Overrun"
-                    }
-                    ErrorKind::Other => {
-                        "Other"
-                    }
-                    _ => {
-                        ""
-                    }
-                },
-                error_ret.1
-            )
-            .unwrap_infallible();
         }
         None
     }

@@ -26,6 +26,8 @@
 )]
 mod proto;
 
+use crate::millis::millis;
+use crate::serial::Telemetry::TimeSync;
 use crate::{CoreClock, State};
 use atmega_hal::port::mode::{Input, Output};
 use atmega_hal::port::{Pin, PD0, PD1};
@@ -75,6 +77,7 @@ pub enum Telemetry {
     MotorPosition(MotorPosition),
     PressureData(PressureValues),
     ToneDetector(ToneDetectorStatus),
+    TimeSync(proto::message_::Message_::Data),
 }
 
 pub enum ToneDetectorLocation {
@@ -87,30 +90,11 @@ pub struct ToneDetectorStatus {
     pub location: ToneDetectorLocation,
 }
 
-fn decode_cobs(
-    data: &[u8],
-    serial: &mut Usart<USART0, Pin<Input, PD0>, Pin<Output, PD1>, CoreClock>,
-) -> Option<([u8; 128], usize)> {
+fn decode_cobs(data: &[u8]) -> Option<([u8; 128], usize)> {
     let mut temporary = [0; 128];
     let result = decode(data, &mut temporary);
     if let Ok(size) = result {
         return Some((temporary, size));
-    } else if let Err(err) = result {
-        match err {
-            DecodeError::EmptyFrame => {
-                #[cfg(feature = "log_info")]
-                uwriteln!(serial, "DecodeError::EmptyFrame\r").unwrap_infallible();
-            }
-            DecodeError::InvalidFrame { decoded_bytes } => {
-                #[cfg(feature = "log_info")]
-                uwriteln!(serial, "DecodeError::InvalidFrame {:?}\r", decoded_bytes)
-                    .unwrap_infallible();
-            }
-            DecodeError::TargetBufTooSmall => {
-                #[cfg(feature = "log_info")]
-                uwriteln!(serial, "DecodeError::TargetBufTooSmall\r").unwrap_infallible();
-            }
-        }
     }
     None
 }
@@ -156,7 +140,7 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                 if let Some(bytes) = state.serial_buf.get(..state.serial_buf_idx) {
                     #[cfg(feature = "log_info")]
                     uwriteln!(&mut state.serial, "Decoding with COBS\r").unwrap_infallible();
-                    decode_cobs(bytes, &mut state.serial)
+                    decode_cobs(bytes)
                 } else {
                     state.serial_buf_idx = 0;
                     return None;
@@ -228,9 +212,22 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                             | proto::message_::Message_::Data::MotorPosition(_)
                             | proto::message_::Message_::Data::ToneDetectorStatus(_)
                             | proto::message_::Message_::Data::PressureData(_)
-                            | proto::message_::Message_::Data::BatterVoltage(_),
+                            | proto::message_::Message_::Data::BatterVoltage(_)
+                            | proto::message_::Message_::Data::ResponseSync(_),
                         )
                         | None => {}
+                        Some(proto::message_::Message_::Data::InitSync(msg)) => {
+                            let t2 = millis();
+                            write(
+                                state,
+                                TimeSync(proto::message_::Message_::Data::ResponseSync(
+                                    proto::sync_::Response {
+                                        delay_ms: t2 as i64 - msg.t1_ms,
+                                        t3_ms: millis() as i64,
+                                    },
+                                )),
+                            );
+                        }
                     };
                 } else {
                     #[cfg(feature = "log_info")]
@@ -305,6 +302,7 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
                 Telemetry::BatteryVoltage(voltage) => {
                     proto::message_::Message_::Data::BatterVoltage(voltage)
                 }
+                TimeSync(data) => data,
             }),
         };
         let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());

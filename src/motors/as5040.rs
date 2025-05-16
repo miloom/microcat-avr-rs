@@ -80,8 +80,6 @@ impl Encoder for As5040 {
         let mut count = 0u32;
         loop {
             self.single_read(state);
-            #[cfg(feature = "log_debug")]
-            uwriteln!(&mut state.serial, "Status: {:x}\r", self.status).unwrap_infallible();
             if self.status & Self::AS5040_STATUS_OCF as u8 != 0 {
                 break;
             }
