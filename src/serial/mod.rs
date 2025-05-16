@@ -26,9 +26,13 @@
 )]
 mod proto;
 
-use crate::State;
+use crate::{CoreClock, State};
+use atmega_hal::port::mode::{Input, Output};
+use atmega_hal::port::{Pin, PD0, PD1};
 use atmega_hal::prelude::*;
-use cobs::decode;
+use atmega_hal::Usart;
+use avr_device::atmega328p::USART0;
+use cobs::{decode, DecodeError};
 use core::str::FromStr;
 use heapless::Vec;
 use micropb::{MessageDecode as _, MessageEncode as _, PbDecoder, PbEncoder};
@@ -71,7 +75,6 @@ pub enum Telemetry {
     MotorPosition(MotorPosition),
     PressureData(PressureValues),
     ToneDetector(ToneDetectorStatus),
-    Debug(::micropb::heapless::String<16>),
 }
 
 pub enum ToneDetectorLocation {
@@ -84,10 +87,30 @@ pub struct ToneDetectorStatus {
     pub location: ToneDetectorLocation,
 }
 
-fn decode_cobs(data: &[u8]) -> Option<[u8; 128]> {
+fn decode_cobs(
+    data: &[u8],
+    serial: &mut Usart<USART0, Pin<Input, PD0>, Pin<Output, PD1>, CoreClock>,
+) -> Option<([u8; 128], usize)> {
     let mut temporary = [0; 128];
-    if decode(data, &mut temporary).is_ok() {
-        return Some(temporary);
+    let result = decode(data, &mut temporary);
+    if let Ok(size) = result {
+        return Some((temporary, size));
+    } else if let Err(err) = result {
+        match err {
+            DecodeError::EmptyFrame => {
+                #[cfg(feature = "log_info")]
+                uwriteln!(serial, "DecodeError::EmptyFrame\r").unwrap_infallible();
+            }
+            DecodeError::InvalidFrame { decoded_bytes } => {
+                #[cfg(feature = "log_info")]
+                uwriteln!(serial, "DecodeError::InvalidFrame {:?}\r", decoded_bytes)
+                    .unwrap_infallible();
+            }
+            DecodeError::TargetBufTooSmall => {
+                #[cfg(feature = "log_info")]
+                uwriteln!(serial, "DecodeError::TargetBufTooSmall\r").unwrap_infallible();
+            }
+        }
     }
     None
 }
@@ -120,80 +143,78 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
         if data == 0 {
             if let Some(last) = state.serial_buf.get_mut(state.serial_buf_idx) {
                 *last = 0;
+                state.serial_buf_idx += 1;
             } else {
                 state.serial_buf_idx = 0;
-                if let Ok(msg) = micropb::heapless::String::from_str("FAILED BUF") {
-                    write(state, Telemetry::Debug(msg));
-                }
                 #[cfg(feature = "log_info")]
-                uwriteln!(&mut state.serial, "Failed to write last byte for message")
+                uwriteln!(&mut state.serial, "Failed to write last byte for message\r")
                     .unwrap_infallible();
                 return None;
             }
 
             let cobs_decoded_data =
-                if let Some(bytes) = state.serial_buf.get_mut(..=state.serial_buf_idx) {
-                    decode_cobs(bytes)
+                if let Some(bytes) = state.serial_buf.get(..state.serial_buf_idx) {
+                    #[cfg(feature = "log_info")]
+                    uwriteln!(&mut state.serial, "Decoding with COBS\r").unwrap_infallible();
+                    decode_cobs(bytes, &mut state.serial)
                 } else {
-                    if let Ok(msg) = micropb::heapless::String::from_str("FAILED COBS") {
-                        write(state, Telemetry::Debug(msg));
-                    }
                     state.serial_buf_idx = 0;
                     return None;
                 };
 
-            if let Ok(msg) = micropb::heapless::String::from_str("COBS") {
-                write(state, Telemetry::Debug(msg));
-            }
-            if let Some(cobs_decoded_data) = cobs_decoded_data {
-                if let Some(msg) = decode_proto(&cobs_decoded_data) {
+            if let Some((cobs_decoded_data, cobs_decoded_size)) = cobs_decoded_data {
+                #[cfg(feature = "log_info")]
+                uwriteln!(&mut state.serial, "Decoding with proto\r").unwrap_infallible();
+                if let Some(msg) = decode_proto(&cobs_decoded_data[..cobs_decoded_size]) {
                     match msg.data {
                         Some(proto::message_::Message_::Data::MotorTarget(target)) => {
-                            if let Ok(msg) = micropb::heapless::String::from_str("MOTOR TARGET") {
-                                write(state, Telemetry::Debug(msg));
-                            }
-
+                            #[cfg(feature = "log_info")]
+                            uwriteln!(&mut state.serial, "Motor target received\r")
+                                .unwrap_infallible();
                             let location = match target.location {
                                 proto::motor_::Location::FrontLeft => {
-                                    if let Ok(msg) =
-                                        micropb::heapless::String::from_str("LOCATION FL")
-                                    {
-                                        write(state, Telemetry::Debug(msg));
-                                    }
+                                    #[cfg(feature = "log_info")]
+                                    uwriteln!(&mut state.serial, "Front left\r")
+                                        .unwrap_infallible();
                                     crate::MotorLocation::FrontLeft
                                 }
                                 proto::motor_::Location::FrontRight => {
-                                    if let Ok(msg) =
-                                        micropb::heapless::String::from_str("LOCATION FR")
-                                    {
-                                        write(state, Telemetry::Debug(msg));
-                                    }
+                                    #[cfg(feature = "log_info")]
+                                    uwriteln!(&mut state.serial, "Front Right\r")
+                                        .unwrap_infallible();
                                     crate::MotorLocation::FrontRight
                                 }
                                 proto::motor_::Location::BackLeft => {
-                                    if let Ok(msg) =
-                                        micropb::heapless::String::from_str("LOCATION RL")
-                                    {
-                                        write(state, Telemetry::Debug(msg));
-                                    }
+                                    #[cfg(feature = "log_info")]
+                                    uwriteln!(&mut state.serial, "Back left\r").unwrap_infallible();
                                     crate::MotorLocation::RearLeft
                                 }
                                 proto::motor_::Location::BackRight => {
-                                    if let Ok(msg) =
-                                        micropb::heapless::String::from_str("LOCATION RR")
-                                    {
-                                        write(state, Telemetry::Debug(msg));
-                                    }
+                                    #[cfg(feature = "log_info")]
+                                    uwriteln!(&mut state.serial, "Back Right\r")
+                                        .unwrap_infallible();
                                     crate::MotorLocation::RearRight
                                 }
                                 _ => {
                                     state.serial_buf_idx = 0;
                                     #[cfg(feature = "log_info")]
-                                    uwriteln!(&mut state.serial, "Failed to decode motor location")
-                                        .unwrap_infallible();
+                                    uwriteln!(
+                                        &mut state.serial,
+                                        "Failed to decode motor location\r"
+                                    )
+                                    .unwrap_infallible();
                                     return None;
                                 }
                             };
+                            #[cfg(feature = "log_info")]
+                            uwriteln!(
+                                &mut state.serial,
+                                "freq: {} amp: {} pos: {}\r",
+                                target.frequency,
+                                target.amplitude,
+                                target.target_position
+                            )
+                            .unwrap_infallible();
                             return Some(Command::MotorCommand(MotorCommand {
                                 frequency: target.frequency,
                                 amplitude: target.amplitude,
@@ -201,16 +222,20 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                                 location,
                             }));
                         }
+
                         Some(
                             proto::message_::Message_::Data::Imu(_)
                             | proto::message_::Message_::Data::MotorPosition(_)
                             | proto::message_::Message_::Data::ToneDetectorStatus(_)
                             | proto::message_::Message_::Data::PressureData(_)
-                            | proto::message_::Message_::Data::BatterVoltage(_)
-                            | proto::message_::Message_::Data::DebugMessage(_),
+                            | proto::message_::Message_::Data::BatterVoltage(_),
                         )
                         | None => {}
                     };
+                } else {
+                    #[cfg(feature = "log_info")]
+                    uwriteln!(&mut state.serial, "Failed to decode using proto\r")
+                        .unwrap_infallible();
                 }
             } else {
                 #[cfg(feature = "log_info")]
@@ -221,6 +246,10 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
         } else if let Some(last) = state.serial_buf.get_mut(state.serial_buf_idx) {
             *last = data;
             state.serial_buf_idx += 1;
+        } else {
+            #[cfg(feature = "log_info")]
+            uwriteln!(&mut state.serial, "Failed to write byte {:#04X}\r", data)
+                .unwrap_infallible();
         }
     }
     None
@@ -276,7 +305,6 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
                 Telemetry::BatteryVoltage(voltage) => {
                     proto::message_::Message_::Data::BatterVoltage(voltage)
                 }
-                Telemetry::Debug(msg) => proto::message_::Message_::Data::DebugMessage(msg),
             }),
         };
         let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());

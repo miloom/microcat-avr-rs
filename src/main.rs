@@ -14,6 +14,7 @@ mod serial;
 mod timer;
 mod tone_detector;
 
+use crate::timer::rig_timer;
 use atmega_hal::adc::AdcSettings;
 use atmega_hal::clock;
 #[cfg(feature = "log_debug")]
@@ -24,19 +25,19 @@ use atmega_hal::port::{Pin, PD0, PD1};
 #[cfg(feature = "log_info")]
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 use atmega_hal::spi;
-use atmega_hal::usart::Baudrate;
+use atmega_hal::usart::{Baudrate, Event};
 use atmega_hal::{adc, adc::channel};
 use atmega_hal::{I2c, Spi, Usart};
 use avr_device::atmega328p::TC1;
+use circular_buffer::CircularBuffer;
 use core::sync::atomic::AtomicBool;
 use core::sync::atomic::Ordering;
 use embedded_hal::spi::{Mode, Phase, Polarity};
+use motors::{MotorLocation, MotorSystem};
 use panic_halt as _;
 use serial::{read_serial, Command, PressureValues, Telemetry};
 use strum::IntoEnumIterator as _;
-
-use crate::timer::rig_timer;
-use motors::{MotorLocation, MotorSystem};
+use ufmt::{uwrite, uwriteln};
 
 static LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
 
@@ -176,20 +177,24 @@ fn main() -> ! {
     #[cfg(feature = "log_info")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap_infallible();
 
+    let mut command_buffer: CircularBuffer<3, Command> = circular_buffer::CircularBuffer::new();
+
     let mut loop_counter = 0u32;
     loop {
-        while !LOOP_INTERRUPT.load(Ordering::SeqCst) {
-            core::hint::spin_loop();
+        if let Some(command) = read_serial(&mut state) {
+            command_buffer.push_back(command);
+        }
+        if !LOOP_INTERRUPT.load(Ordering::SeqCst) {
+            continue;
         }
         LOOP_INTERRUPT.store(false, Ordering::SeqCst);
         if loop_counter == 0 {
-            // led.toggle();
+            led.toggle();
         }
         loop_counter = loop_counter.wrapping_add(1);
-        loop_counter %= 100;
+        loop_counter %= 10;
 
-        if let Some(command) = read_serial(&mut state) {
-            led.toggle();
+        for command in command_buffer.drain(..) {
             match command {
                 Command::MotorCommand(command) => {
                     if let Some(motor) = motor_system.get_motor_mut(command.location) {
