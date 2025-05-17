@@ -115,7 +115,7 @@ fn encode_cobs(data: &[u8]) -> ([u8; 128], usize) {
     clippy::single_call_fn,
     reason = "Currently only used once, but kept for convenience"
 )]
-pub fn read_serial(state: &mut State, time_count: &mut u32) -> Option<Command> {
+pub fn read_serial(state: &mut State) -> Option<(Command, u32)> {
     while let Ok(data) = state.serial.read() {
         if data == 0 {
             if let Some(last) = state.serial_buf.get_mut(state.serial_buf_idx) {
@@ -145,6 +145,7 @@ pub fn read_serial(state: &mut State, time_count: &mut u32) -> Option<Command> {
                 if let Some(msg) = decode_proto(&cobs_decoded_data[..cobs_decoded_size]) {
                     match msg.data {
                         Some(proto::message_::Message_::Data::MotorTarget(target)) => {
+                            let start = millis();
                             #[cfg(feature = "log_info")]
                             uwriteln!(&mut state.serial, "Motor target received\r")
                                 .unwrap_infallible();
@@ -153,14 +154,6 @@ pub fn read_serial(state: &mut State, time_count: &mut u32) -> Option<Command> {
                                     #[cfg(feature = "log_info")]
                                     uwriteln!(&mut state.serial, "Front left\r")
                                         .unwrap_infallible();
-                                    write(
-                                        state,
-                                        Telemetry::Time(TimeMeasurement {
-                                            time_ms: i64::from(millis()),
-                                            count: *time_count,
-                                        }),
-                                    );
-                                    *time_count += 1;
                                     crate::MotorLocation::FrontLeft
                                 }
                                 proto::motor_::Location::FrontRight => {
@@ -200,12 +193,15 @@ pub fn read_serial(state: &mut State, time_count: &mut u32) -> Option<Command> {
                                 target.target_position
                             )
                             .unwrap_infallible();
-                            return Some(Command::MotorCommand(MotorCommand {
-                                frequency: target.frequency,
-                                amplitude: target.amplitude,
-                                position: target.target_position,
-                                location,
-                            }));
+                            return Some((
+                                Command::MotorCommand(MotorCommand {
+                                    frequency: target.frequency,
+                                    amplitude: target.amplitude,
+                                    position: target.target_position,
+                                    location,
+                                }),
+                                start,
+                            ));
                         }
 
                         Some(
@@ -214,18 +210,7 @@ pub fn read_serial(state: &mut State, time_count: &mut u32) -> Option<Command> {
                             | proto::message_::Message_::Data::Time(_),
                         )
                         | None => {}
-                        Some(proto::message_::Message_::Data::InitSync(msg)) => {
-                            let t2 = millis();
-                            write(
-                                state,
-                                TimeSync(proto::message_::Message_::Data::ResponseSync(
-                                    proto::sync_::Response {
-                                        delay_ms: i64::from(t2) - msg.t1_ms,
-                                        t3_ms: i64::from(millis()),
-                                    },
-                                )),
-                            );
-                        }
+                        Some(proto::message_::Message_::Data::InitSync(_)) => {}
                     };
                 } else {
                     #[cfg(feature = "log_info")]
@@ -275,7 +260,7 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
             let writer = encoder.into_writer();
             let (cobs_encoded, len) = crate::serial::encode_cobs(&writer);
             for data in cobs_encoded.iter().take(len) {
-                state.serial.write_byte(*data);
+                // state.serial.write_byte(*data);
             }
         }
     }

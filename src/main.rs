@@ -14,6 +14,7 @@ mod serial;
 mod timer;
 mod tone_detector;
 
+use crate::millis::millis;
 use crate::timer::rig_timer;
 use atmega_hal::adc::AdcSettings;
 use atmega_hal::clock;
@@ -22,6 +23,7 @@ use atmega_hal::i2c::Direction;
 use atmega_hal::pac::USART0;
 use atmega_hal::port::mode::{Input, Output};
 use atmega_hal::port::{Pin, PD0, PD1};
+use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 #[cfg(feature = "log_info")]
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 use atmega_hal::spi;
@@ -37,6 +39,7 @@ use motors::{MotorLocation, MotorSystem};
 use panic_halt as _;
 use serial::{read_serial, Command, PressureValues, Telemetry};
 use strum::IntoEnumIterator as _;
+use ufmt::uwriteln;
 
 static LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
 
@@ -176,12 +179,12 @@ fn main() -> ! {
     #[cfg(feature = "log_info")]
     ufmt::uwriteln!(&mut state.serial, "Starting...\r").unwrap_infallible();
 
-    let mut command_buffer: CircularBuffer<3, Command> = circular_buffer::CircularBuffer::new();
+    let mut command_buffer: CircularBuffer<3, (Command, u32)> =
+        circular_buffer::CircularBuffer::new();
 
     let mut loop_counter = 0u32;
-    let mut time_counter = 0u32;
     loop {
-        if let Some(command) = read_serial(&mut state, &mut time_counter) {
+        if let Some(command) = read_serial(&mut state) {
             command_buffer.push_back(command);
         }
         if !LOOP_INTERRUPT.load(Ordering::SeqCst) {
@@ -194,16 +197,24 @@ fn main() -> ! {
         loop_counter = loop_counter.wrapping_add(1);
         loop_counter %= 10;
 
-        for command in command_buffer.drain(..) {
-            match command {
-                Command::MotorCommand(command) => {
-                    if let Some(motor) = motor_system.get_motor_mut(command.location) {
-                        motor.target_position = command.position;
-                        motor.amplitude = command.amplitude;
-                        motor.frequency = command.frequency;
+        let timings = command_buffer
+            .drain(..)
+            .filter_map(|(command, start)| {
+                match command {
+                    Command::MotorCommand(command) => {
+                        if let Some(motor) = motor_system.get_motor_mut(command.location) {
+                            motor.target_position = command.position;
+                            motor.amplitude = command.amplitude;
+                            motor.frequency = command.frequency;
+                            return Some((start, millis()));
+                        }
                     }
-                }
-            };
+                };
+                None
+            })
+            .collect::<heapless::Vec<_, 3>>();
+        for (start, end) in timings {
+            uwriteln!(state.serial, "Timing: {}ms\r", end - start).unwrap_infallible();
         }
         for location in MotorLocation::iter() {
             if let Some(motor) = motor_system.get_motor_mut(location) {
