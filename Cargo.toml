@@ -1,6 +1,6 @@
 [package]
 name = "microcat-avr-rs"
-version = "0.1.0"
+version = "1.0.0"
 description = "Code for Atmega328p of microcat"
 repository = "https://github.com/miloom/microcat-avr-rs"
 authors = ["Mikk Loomets <miloom@taltech.ee>"]
