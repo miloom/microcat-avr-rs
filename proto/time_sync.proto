@@ -10,3 +10,8 @@ message Response {
   int64 delay_ms = 1;
   int64 t3_ms = 2;
 }
+
+message TimeMeasurement {
+  int64 time_ms = 1;
+  uint32 count = 2;
+}

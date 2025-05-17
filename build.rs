@@ -56,6 +56,12 @@ fn main() {
             .no_debug_impl(true)
             .no_partial_eq_impl(true),
     );
+    gen.configure(".Message.Initialize", Config::new().no_default_impl(true));
+    gen.configure(".Message.Response", Config::new().no_default_impl(true));
+    gen.configure(
+        ".Message.TimeMeasurement",
+        Config::new().no_default_impl(true),
+    );
     gen.format(true);
     gen.compile_protos(&proto_files, "src/serial/proto.rs")
         .unwrap();

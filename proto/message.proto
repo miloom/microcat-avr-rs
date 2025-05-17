@@ -10,13 +10,14 @@ import "time_sync.proto";
 
 message Message {
   oneof data {
-    imu.Telemetry imu = 1;
+    // imu.Telemetry imu = 1;
     motor.MotorTarget motor_target = 2;
     motor.MotorPosition motor_position = 3;
-    tone_detector.ToneDetectorStatus tone_detector_status = 4;
-    pressure.PressureData pressure_data = 5;
-    uint32 batter_voltage = 6; // Measured battery voltage in mV
+    // tone_detector.ToneDetectorStatus tone_detector_status = 4;
+    // pressure.PressureData pressure_data = 5;
+    // uint32 batter_voltage = 6; // Measured battery voltage in mV
     sync.Initialize init_sync = 7;
     sync.Response response_sync = 8;
+    sync.TimeMeasurement time = 9;
   }
 }

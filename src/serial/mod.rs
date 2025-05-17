@@ -27,15 +27,11 @@
 mod proto;
 
 use crate::millis::millis;
+use crate::serial::proto::sync_::TimeMeasurement;
 use crate::serial::Telemetry::TimeSync;
-use crate::{CoreClock, State};
-use atmega_hal::port::mode::{Input, Output};
-use atmega_hal::port::{Pin, PD0, PD1};
+use crate::State;
 use atmega_hal::prelude::*;
-use atmega_hal::Usart;
-use avr_device::atmega328p::USART0;
-use cobs::{decode, DecodeError};
-use core::str::FromStr;
+use cobs::decode;
 use heapless::Vec;
 use micropb::{MessageDecode as _, MessageEncode as _, PbDecoder, PbEncoder};
 #[cfg(feature = "log_info")]
@@ -72,12 +68,9 @@ pub struct PressureValues {
 }
 
 pub enum Telemetry {
-    BatteryVoltage(u32),
-    Imu(ImuReading),
     MotorPosition(MotorPosition),
-    PressureData(PressureValues),
-    ToneDetector(ToneDetectorStatus),
     TimeSync(proto::message_::Message_::Data),
+    Time(TimeMeasurement),
 }
 
 pub enum ToneDetectorLocation {
@@ -122,7 +115,7 @@ fn encode_cobs(data: &[u8]) -> ([u8; 128], usize) {
     clippy::single_call_fn,
     reason = "Currently only used once, but kept for convenience"
 )]
-pub fn read_serial(state: &mut State) -> Option<Command> {
+pub fn read_serial(state: &mut State, time_count: &mut u32) -> Option<Command> {
     while let Ok(data) = state.serial.read() {
         if data == 0 {
             if let Some(last) = state.serial_buf.get_mut(state.serial_buf_idx) {
@@ -160,6 +153,14 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                                     #[cfg(feature = "log_info")]
                                     uwriteln!(&mut state.serial, "Front left\r")
                                         .unwrap_infallible();
+                                    write(
+                                        state,
+                                        Telemetry::Time(TimeMeasurement {
+                                            time_ms: i64::from(millis()),
+                                            count: *time_count,
+                                        }),
+                                    );
+                                    *time_count += 1;
                                     crate::MotorLocation::FrontLeft
                                 }
                                 proto::motor_::Location::FrontRight => {
@@ -208,12 +209,9 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                         }
 
                         Some(
-                            proto::message_::Message_::Data::Imu(_)
-                            | proto::message_::Message_::Data::MotorPosition(_)
-                            | proto::message_::Message_::Data::ToneDetectorStatus(_)
-                            | proto::message_::Message_::Data::PressureData(_)
-                            | proto::message_::Message_::Data::BatterVoltage(_)
-                            | proto::message_::Message_::Data::ResponseSync(_),
+                            proto::message_::Message_::Data::MotorPosition(_)
+                            | proto::message_::Message_::Data::ResponseSync(_)
+                            | proto::message_::Message_::Data::Time(_),
                         )
                         | None => {}
                         Some(proto::message_::Message_::Data::InitSync(msg)) => {
@@ -222,8 +220,8 @@ pub fn read_serial(state: &mut State) -> Option<Command> {
                                 state,
                                 TimeSync(proto::message_::Message_::Data::ResponseSync(
                                     proto::sync_::Response {
-                                        delay_ms: t2 as i64 - msg.t1_ms,
-                                        t3_ms: millis() as i64,
+                                        delay_ms: i64::from(t2) - msg.t1_ms,
+                                        t3_ms: i64::from(millis()),
                                     },
                                 )),
                             );
@@ -256,20 +254,6 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
     {
         let message = proto::message_::Message {
             data: Some(match telemetry {
-                Telemetry::Imu(reading) => {
-                    let mut data = proto::imu_::Telemetry::default();
-                    data.set_accel(proto::imu_::AccelData {
-                        x: i32::from(reading.accel_x),
-                        y: i32::from(reading.accel_y),
-                        z: i32::from(reading.accel_z),
-                    });
-                    data.set_gyro(proto::imu_::GyroData {
-                        x: i32::from(reading.gyro_x),
-                        y: i32::from(reading.gyro_y),
-                        z: i32::from(reading.gyro_z),
-                    });
-                    proto::message_::Message_::Data::Imu(data)
-                }
                 Telemetry::MotorPosition(position) => {
                     let data = proto::motor_::MotorPosition {
                         position: i32::from(position.position),
@@ -282,27 +266,8 @@ pub fn write(state: &mut State, telemetry: Telemetry) {
                     };
                     proto::message_::Message_::Data::MotorPosition(data)
                 }
-                Telemetry::ToneDetector(tone_detector) => {
-                    let data = proto::tone_detector_::ToneDetectorStatus {
-                        location: match tone_detector.location {
-                            ToneDetectorLocation::Left => proto::tone_detector_::Location::Left,
-                            ToneDetectorLocation::Right => proto::tone_detector_::Location::Right,
-                        },
-                        is_high: tone_detector.is_high,
-                    };
-                    proto::message_::Message_::Data::ToneDetectorStatus(data)
-                }
-                Telemetry::PressureData(data) => {
-                    let data = proto::pressure_::PressureData {
-                        pressure: data.pressure,
-                        temperature: data.temperature,
-                    };
-                    proto::message_::Message_::Data::PressureData(data)
-                }
-                Telemetry::BatteryVoltage(voltage) => {
-                    proto::message_::Message_::Data::BatterVoltage(voltage)
-                }
                 TimeSync(data) => data,
+                Telemetry::Time(data) => proto::message_::Message_::Data::Time(data),
             }),
         };
         let mut encoder = PbEncoder::new(Vec::<u8, 64>::new());

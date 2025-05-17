@@ -25,7 +25,7 @@ use atmega_hal::port::{Pin, PD0, PD1};
 #[cfg(feature = "log_info")]
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
 use atmega_hal::spi;
-use atmega_hal::usart::{Baudrate, Event};
+use atmega_hal::usart::Baudrate;
 use atmega_hal::{adc, adc::channel};
 use atmega_hal::{I2c, Spi, Usart};
 use avr_device::atmega328p::TC1;
@@ -37,7 +37,6 @@ use motors::{MotorLocation, MotorSystem};
 use panic_halt as _;
 use serial::{read_serial, Command, PressureValues, Telemetry};
 use strum::IntoEnumIterator as _;
-use ufmt::{uwrite, uwriteln};
 
 static LOOP_INTERRUPT: AtomicBool = AtomicBool::new(false);
 
@@ -180,8 +179,9 @@ fn main() -> ! {
     let mut command_buffer: CircularBuffer<3, Command> = circular_buffer::CircularBuffer::new();
 
     let mut loop_counter = 0u32;
+    let mut time_counter = 0u32;
     loop {
-        if let Some(command) = read_serial(&mut state) {
+        if let Some(command) = read_serial(&mut state, &mut time_counter) {
             command_buffer.push_back(command);
         }
         if !LOOP_INTERRUPT.load(Ordering::SeqCst) {
@@ -221,50 +221,17 @@ fn main() -> ! {
         if let Ok(imu_measurements) = imu.read(&mut state) {
             #[cfg(feature = "log_trace")]
             ufmt::uwriteln!(&mut state.serial, "IMU Read...\r").unwrap_infallible();
-            serial::write(
-                &mut state,
-                serial::Telemetry::Imu(serial::ImuReading {
-                    accel_x: imu_measurements.accel_x,
-                    accel_y: imu_measurements.accel_y,
-                    accel_z: imu_measurements.accel_z,
-                    gyro_x: imu_measurements.gyro_x,
-                    gyro_y: imu_measurements.gyro_y,
-                    gyro_z: imu_measurements.gyro_z,
-                }),
-            );
         } else {
             #[cfg(feature = "log_debug")]
             ufmt::uwriteln!(&mut state.serial, "Reading IMU failed\r").unwrap_infallible();
         }
         #[cfg(feature = "log_trace")]
         ufmt::uwriteln!(&mut state.serial, "Reading ToneDetectors...\r").unwrap_infallible();
-        serial::write(
-            &mut state,
-            serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
-                location: serial::ToneDetectorLocation::Left,
-                is_high: left_tone_detector.read(),
-            }),
-        );
-        serial::write(
-            &mut state,
-            serial::Telemetry::ToneDetector(serial::ToneDetectorStatus {
-                location: serial::ToneDetectorLocation::Right,
-                is_high: right_tone_detector.read(),
-            }),
-        );
 
         #[cfg(feature = "log_trace")]
         ufmt::uwriteln!(&mut state.serial, "Reading PressureSensor...\r").unwrap_infallible();
         if let Some(pressure_sensor) = &pressure_sensor {
-            if let Some(pressure_data) = pressure_sensor.read(&mut state) {
-                serial::write(
-                    &mut state,
-                    Telemetry::PressureData(PressureValues {
-                        pressure: pressure_data.pressure,
-                        temperature: pressure_data.temperature,
-                    }),
-                );
-            }
+            if let Some(pressure_data) = pressure_sensor.read(&mut state) {}
         }
 
         {
@@ -272,11 +239,6 @@ fn main() -> ! {
             const VREF: u32 = 1100; // mV
             let pin_voltage = u32::from(value) * VREF / 1023; // mV
             const VOLTAGE_DIVIDER_MULT: u32 = 9393; // Scaled up by 1000
-
-            serial::write(
-                &mut state,
-                Telemetry::BatteryVoltage(pin_voltage * VOLTAGE_DIVIDER_MULT / 1000),
-            );
         }
     }
 }
