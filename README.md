@@ -1,14 +1,14 @@
 microcat-avr-rs
 ===============
 
-Rust project for the _Arduino Uno_.
+Rust project for ATmega328P.
 
 ## Build Instructions
 1. Install prerequisites as described in the [`avr-hal` README] (`avr-gcc`, `avr-libc`, `avrdude`, [`ravedude`]).
 
-2. Run `cargo build` to build the firmware.
+2. Run `cargo build --release` to build the firmware.
 
-3. Run `cargo run` to flash the firmware to a connected board.  If `ravedude`
+3. Run `cargo run --release` to flash the firmware to a connected board.  If `ravedude`
    fails to detect your board, check its documentation at
    <https://crates.io/crates/ravedude>.
 
