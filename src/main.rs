@@ -136,27 +136,28 @@ fn main() -> ! {
     let mut motor_system = MotorSystem::new();
     motor_system.initialize(
         MotorLocation::FrontLeft,
-        pins.pb0.into_output().downgrade(),
-        &mut state,
-    );
-    motor_system.initialize(
-        MotorLocation::FrontRight,
         pins.pd7.into_output().downgrade(),
         &mut state,
     );
     motor_system.initialize(
-        MotorLocation::RearLeft,
+        MotorLocation::FrontRight,
+        pins.pb0.into_output().downgrade(),
+        &mut state,
+    );
+    motor_system.initialize(
+        MotorLocation::RearRight,
         pins.pb1.into_output().downgrade(),
         &mut state,
     );
+
     // SAFETY: We will never remove the pin from this motor and the motor will never turn it into input so this is safe.
     unsafe {
         motor_system.initialize(
-            MotorLocation::RearRight,
+            MotorLocation::RearLeft,
             d10.into_pin_unchecked().downgrade(),
             &mut state,
         );
-    };
+    }
 
     let imu = imu::Imu::new(&mut state);
     #[cfg(feature = "log_trace")]
@@ -180,6 +181,7 @@ fn main() -> ! {
     let mut command_buffer: CircularBuffer<3, Command> = circular_buffer::CircularBuffer::new();
 
     let mut loop_counter = 0u32;
+    let mut first_loop = true;
     loop {
         if let Some(command) = read_serial(&mut state) {
             command_buffer.push_back(command);
@@ -207,6 +209,9 @@ fn main() -> ! {
         }
         for location in MotorLocation::iter() {
             if let Some(motor) = motor_system.get_motor_mut(location) {
+                if first_loop {
+                    motor.zero_offset = motor.get_position(&mut state);
+                }
                 motor.update(&mut state);
                 let position = serial::Telemetry::MotorPosition(serial::MotorPosition {
                     location,
@@ -214,6 +219,9 @@ fn main() -> ! {
                 });
                 serial::write(&mut state, position);
             }
+        }
+        if first_loop {
+            first_loop = false;
         }
 
         #[cfg(feature = "log_trace")]

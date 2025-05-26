@@ -9,6 +9,7 @@ use atmega_hal::port::mode::Output;
 use atmega_hal::port::Pin;
 #[cfg(feature = "log")]
 use atmega_hal::prelude::_unwrap_infallible_UnwrapInfallible as _;
+use avr_device::asm::delay_cycles;
 use core::f32::consts::PI;
 use drv8830::WriteRegister as _;
 use micromath::F32Ext as _;
@@ -24,6 +25,7 @@ pub struct MotorController {
     pid: IntegerPID,
     reversed: bool,
     pub target_position: i32,
+    pub zero_offset: i16,
 }
 
 impl MotorController {
@@ -76,7 +78,8 @@ impl MotorController {
             amplitude: 0,
             reversed: false,
             target_position: 0,
-            pid: IntegerPID::new(0.6, 0.0, 0.0, 100, -100, 100),
+            pid: IntegerPID::new(0.6, 0.01, 0.0, 100, -100, 100),
+            zero_offset: 0,
         }
     }
 
@@ -105,7 +108,8 @@ impl MotorController {
         } else {
             desired_position
         };
-        let shortest_path = (desired_position as i16).wrapping_sub(self.encoder.read(state));
+        let shortest_path =
+            (desired_position as i16).wrapping_sub(self.encoder.read(state) - self.zero_offset);
         if let Some(val) = Self::wrap_angle(shortest_path, i32::from(ENCODER_MAX)) {
             let control = self.pid.compute(val);
             self.drive(state, control as i16);
@@ -156,8 +160,8 @@ impl MotorLocation {
         match self {
             Self::FrontLeft => 0x61,
             Self::FrontRight => 0x63,
-            Self::RearLeft => 0x64,
-            Self::RearRight => 0x60,
+            Self::RearLeft => 0x60,
+            Self::RearRight => 0x64,
         }
     }
 
